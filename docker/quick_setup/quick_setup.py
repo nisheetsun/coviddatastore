@@ -27,7 +27,7 @@ class DockerComposeBuilder(object):
     def get_lost(self):
         return (
             '    lost:\n'
-            '      image: l3pcv/lost:${LOST_VERSION}\n'
+            '      image: tensorwerk/hangarlost\n'
             '      container_name: lost\n'
             '      command: bash /entrypoint.sh\n'
             '      env_file:\n'
@@ -143,7 +143,7 @@ class QuickSetup(object):
             ['#======================','#'],
             ['DEBUG','False'],
             ['# Add example pipelines and example images ','#'],
-            ['ADD_EXAMPLES','True'],
+            ['ADD_EXAMPLES','False'],
             ['#= Add also ai pipelines if true. You will need the lost-cv worker to execute these pipelines.',' #'],
             ['ADD_AI_EXAMPLES', ai_examples],
             ['LOST_VERSION', self.release],
