@@ -10,7 +10,8 @@ from lost.db.model import User as DBUser, Role, Group
 from lost.logic import email 
 from lost.logic.user import release_user_annos
 from flaskapp import blacklist
-
+import logging
+logger = logging.getLogger(__name__)
 namespace = api.namespace('user', description='Users in System.')
 
 @namespace.route('')

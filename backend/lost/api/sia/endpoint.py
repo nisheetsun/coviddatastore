@@ -7,9 +7,30 @@ from lost.api.label.api_definition import label_trees
 from lost.db import roles, access
 from lost.settings import LOST_CONFIG, DATA_URL
 from lost.logic import sia
+import hangar
+import numpy as np
 import json
+import logging
+logger = logging.getLogger(__name__)
 
 namespace = api.namespace('sia', description='SIA Annotation API.')
+
+
+repo = hangar.Repository('/home/lost/')
+if not repo.initialized:
+    repo.init(user_name='Sherin', user_email='sherin@tensorwerk.com')
+    co = repo.checkout(write=True)
+    path = co.add_str_column('paths')
+    ann = co.add_ndarray_column('annotations', contains_subsamples=True, dtype=np.float64,
+                                variable_shape=True, shape=(200, 2))
+    co.commit('Added columns')
+else:
+    if repo.writer_lock_held:
+        repo.force_release_writer_lock()
+    co = repo.checkout(write=True)
+    path = co.columns['paths']
+    ann = co.columns['annotations']
+
 
 @namespace.route('/first')
 class First(Resource):
@@ -44,6 +65,15 @@ class Next(Resource):
             last_img_id = int(last_img_id)
             re = sia.get_next(dbm, identity,last_img_id, DATA_URL)
             dbm.close_session()
+            logger.critical('++++++++++++++++++ SIA next ++++++++++++++++++')
+            logger.critical(re)
+            # ======================== Hangar update ========================
+            imid = re['image']['id']
+            imurl = re['image']['url']
+            if imid not in path:
+                path[imid] = imurl
+                co.commit('Addding path')
+            # ===============================================================
             return re
 
 @namespace.route('/prev/<int:last_img_id>')
@@ -62,6 +92,8 @@ class Prev(Resource):
         else:
             re = sia.get_previous(dbm, identity,last_img_id, DATA_URL)
             dbm.close_session()
+            logger.critical('++++++++++++++++++ SIA prev ++++++++++++++++++')
+            logger.critical(re)
             return re
 
 @namespace.route('/lastedited')
@@ -99,8 +131,24 @@ class Update(Resource):
 
         else:
             data = json.loads(request.data)
+            # ================ Hangar Update =====================
+            all_polygon = {}
+            for each_polygon in data['annotations']['polygons']:
+                polygon_coordinates = []
+                coordinate_list = each_polygon['data']
+                for coordinate in coordinate_list:
+                    x, y = coordinate['x'], coordinate['y']
+                    polygon_coordinates.append([x, y])
+                label = each_polygon['labelIds'][0]
+                all_polygon[label] = np.array(polygon_coordinates)
+            ann[data['imgId']] = all_polygon
+            co.commit('added annotation')
+            # ========================================================
             re = sia.update(dbm, data, user.idx)
             dbm.close_session()
+            logger.critical('++++++++++++++++++ SIA update ++++++++++++++++++')
+            logger.critical(re)
+            logger.critical(data)
             return re
 
 @namespace.route('/finish')
@@ -167,4 +215,6 @@ class Configuration(Resource):
             re = sia.get_configuration(dbm, identity)
             print ('Anno task config in endpoint', re)
             dbm.close_session()
+            logger.critical('++++++++++++++ SIA configuraiton +++++++++++++++')
+            logger.critical(re)
             return re
