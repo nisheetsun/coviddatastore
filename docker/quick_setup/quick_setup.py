@@ -143,7 +143,7 @@ class QuickSetup(object):
             ['#======================','#'],
             ['DEBUG','False'],
             ['# Add example pipelines and example images ','#'],
-            ['ADD_EXAMPLES','False'],
+            ['ADD_EXAMPLES','True'],
             ['#= Add also ai pipelines if true. You will need the lost-cv worker to execute these pipelines.',' #'],
             ['ADD_AI_EXAMPLES', ai_examples],
             ['LOST_VERSION', self.release],
