@@ -7,6 +7,36 @@ from lost.api.label.parsers import update_label_parser, create_label_parser
 from lost.db import model, roles, access
 from lost.settings import LOST_CONFIG
 from lost.logic.label import LabelTree
+import logging
+logger = logging.getLogger(__name__)
+
+
+# Adding initial label tree if it doesn't exist
+dbm = access.DBMan(LOST_CONFIG)
+root_leaves = dbm.get_all_label_trees()
+foundcovid = False
+for root_leaf in root_leaves:
+    if LabelTree(dbm, root_leaf.idx).to_hierarchical_dict().get('name') == 'Covid19':
+        foundcovid = True
+if not foundcovid:
+    rootlabel = model.LabelLeaf(name='Covid19',
+                                abbreviation=None,
+                                description='Covid19 dataset labels contains 5 labels',
+                                external_id=None,
+                                is_root=True)
+    rootlabel.parent_leaf_id = None
+    dbm.save_obj(rootlabel)
+    for l in ['Parenchyma', 'Emphysema', 'Ground glass', 'Crazy Paving', 'Consolidation']:
+        label = model.LabelLeaf(name=l,
+                                abbreviation=None,
+                                description=None,
+                                external_id=None,
+                                parent_leaf_id=rootlabel.idx,
+                                is_root=False)
+        dbm.save_obj(label)
+
+dbm.close_session()
+
 
 namespace = api.namespace('label', description='Label API.')
 
@@ -27,6 +57,8 @@ class LabelTrees(Resource):
             for root_leaf in root_leaves:
                 trees.append(LabelTree(dbm, root_leaf.idx).to_hierarchical_dict())
             dbm.close_session()
+            logger.critical(',,,,,,,,,,,, LabelTree ,,,,,,,,,,,,,,,,,,')
+            logger.critical(trees)
             return trees
 
 
@@ -56,6 +88,8 @@ class LabelEditNew(Resource):
     @jwt_required 
     def post(self):
         args = create_label_parser.parse_args()
+        logger.critical(',,,,,,,,,,,,,,,, LabelPost ,,,,,,,,,,,,,,,')
+        logger.critical(args)
         dbm = access.DBMan(LOST_CONFIG)
         identity = get_jwt_identity()
         user = dbm.get_user_by_id(identity)
