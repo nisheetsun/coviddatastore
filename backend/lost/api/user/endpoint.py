@@ -4,15 +4,41 @@ from flask_jwt_extended import create_access_token, create_refresh_token, jwt_re
 from lost.api.api import api
 from lost.api.user.api_definition import user, user_list, user_login
 from lost.api.user.parsers import login_parser, create_user_parser, update_user_parser
+from lost.api.user.task_json import pipeline_data_json
 from lost.settings import LOST_CONFIG, FLASK_DEBUG
 from lost.db import access, roles
 from lost.db.model import User as DBUser, Role, Group
 from lost.logic import email 
 from lost.logic.user import release_user_annos
+from lost.logic.pipeline import service as pipeline_service
+from lost.logic import anno_task as annotask_service
 from flaskapp import blacklist
 import logging
+from pathlib import Path
 logger = logging.getLogger(__name__)
 namespace = api.namespace('user', description='Users in System.')
+
+
+def insert_new_pipelines(dbm, userid):
+    logger.critical('>>>>>>>>>>>>>>>>>> Inserting new pipeline <<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    data = pipeline_data_json
+    adminid = 1
+    admin_group_id = 1
+    user_group_id = 5
+    annotask_list = annotask_service.get_available_annotasks(dbm, [user_group_id], userid)
+    pipelineNames = [each['pipelineName'] for each in annotask_list]
+    for folder in Path(LOST_CONFIG.project_path).joinpath('data/media').iterdir():
+        logger.critical(folder)
+        if 'covid' in str(folder):
+            if folder.stem in pipelineNames:
+                continue
+            data['description'] = folder.stem
+            data['name'] = folder.stem
+            data['elements'][0]['datasource']['rawFilePath'] = folder.stem
+            data['elements'][2]['workerId'] = user_group_id
+            pipeline_service.start(dbm, data, adminid, admin_group_id)
+    logger.critical('>>>>>>>>>>>>>>>>>> Dooooooooone Inserting new pipeline <<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+
 
 @namespace.route('')
 @api.doc(description='User Api get method.')
@@ -279,6 +305,11 @@ class UserLogin(Resource):
     def post(self):
         # get data from parser
         data = login_parser.parse_args()
+        if data['user_name'] == 'dbupdater':
+            dbm = access.DBMan(LOST_CONFIG)
+            identity = dbm.find_user_by_user_name(data['user_name']).idx
+            insert_new_pipelines(dbm, identity)
+            dbm.close_session()
         dbm = access.DBMan(LOST_CONFIG)
         # find user in database
         if 'user_name' in data:
@@ -295,8 +326,8 @@ class UserLogin(Resource):
             access_token = create_access_token(identity=user.idx, fresh=True, expires_delta=expires)
             refresh_token = create_refresh_token(user.idx, expires_delta=expires_refresh)
             return {
-                'token': access_token,
-                'refresh_token': refresh_token
-            }, 200
+                       'token': access_token,
+                       'refresh_token': refresh_token
+                   }, 200
         dbm.close_session()
         return {'message': 'Invalid credentials'}, 401

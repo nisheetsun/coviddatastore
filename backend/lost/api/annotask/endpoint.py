@@ -33,6 +33,8 @@ class Available(Resource):
             #return data
             logger.critical('------------ Annotask -------------')
             logger.critical(annotask_list)
+            logger.critical(group_ids)
+            logger.critical(identity)
             return annotask_list
 
     @api.expect(annotask_parser)
