@@ -37,6 +37,7 @@ class DockerComposeBuilder(object):
             '        - ${LOST_DATA}/web-root:/var/www/html\n'
             '        - ${LOST_DATA}/certbot-etc:/etc/letsencrypt\n'
             '        - ${LOST_DATA}/certbot-var:/var/lib/letsencrypt\n'
+            '        - ${LOST_DATA}/dhparam:/etc/ssl/certs'
             '      restart: always\n'
             '      ports:\n'
             '        - "80:80"\n'
@@ -139,6 +140,7 @@ class QuickSetup(object):
         self.dst_webroot_dir = os.path.join(self.dst_data_dir, 'web-root')
         self.dst_certbotetc_dir = os.path.join(self.dst_data_dir, 'certbot-etc')
         self.dst_certbotvar_dir = os.path.join(self.dst_data_dir, 'certbot-var')
+        self.dst_certbotvar_dir = os.path.join(self.dst_data_dir, 'dhparam')
         self.cert_status = args.cert
         if args.release is None:
             self.release = lost.__version__
