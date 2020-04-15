@@ -102,7 +102,7 @@ class DockerComposeBuilder(object):
             '            - ${LOST_DATA}/web-root:/var/www/html\n'
             '        depends_on:\n'
             '            - lost\n'
-            '        ' + command
+            '' + command
         )
     
     def get_rabbitmq(self):
