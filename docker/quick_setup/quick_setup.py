@@ -147,8 +147,10 @@ class QuickSetup(object):
     
     def write_docker_compose(self, store_path):
         builder = DockerComposeBuilder()
-        if self.args.no_ai or self.args.add_gpu_worker:
+        if 'cert' in store_path and self.cert_status:
             builder.write_production_file(store_path, add_lostcv=False, cert=self.cert_status)
+        if self.args.no_ai or self.args.add_gpu_worker:
+            builder.write_production_file(store_path, add_lostcv=False)
         else:
             builder.write_production_file(store_path, add_lostcv=True)
         logging.info('Wrote docker-compose config to: {}'.format(store_path))
@@ -259,6 +261,7 @@ class QuickSetup(object):
         logging.info('Created: {}'.format(self.dst_certbotvar_dir))
         # example_config_path = '../compose/prod-docker-compose.yml'
         dst_config = os.path.join(self.dst_docker_dir, 'docker-compose.yml')
+        dst_config = os.path.join(self.dst_docker_dir, 'docker-compose-cert.yml')
         # shutil.copy(example_config_path, dst_config)
         self.write_docker_compose(dst_config)
         env_path = os.path.join(self.dst_docker_dir,'.env')
