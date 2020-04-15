@@ -34,6 +34,9 @@ class DockerComposeBuilder(object):
             '        - .env\n'
             '      volumes:\n'
             '        - ${LOST_DATA}:/home/lost\n'
+            '        - web-root:/var/www/html\n'
+            '        - certbot-etc:/etc/letsencrypt\n'
+            '        - certbot-var:/var/lib/letsencrypt\n'
             '      restart: always\n'
             '      ports:\n'
             '        - "80:80"\n'
@@ -83,6 +86,24 @@ class DockerComposeBuilder(object):
             '          - db-lost\n'
             '          - rabbitmqlost\n\n'
         )
+
+    def get_cert(self, cert):
+        if cert == 'staging':
+            command = '    command: certonly --webroot --webroot-path=/var/www/html --email sherin@tensorwerk.com --agree-tos --no-eff-email --staging -d coviddata.store  -d www.coviddata.store\n\n'
+        else:
+            command = '    command: certonly --webroot --webroot-path=/var/www/html --email sherin@tensorwerk.com --agree-tos --no-eff-email -d coviddata.store  -d www.coviddata.store\n\n'
+        return (
+            '    certbot:\n'
+            '    image: certbot/certbot\n'
+            '    container_name: certbot\n'
+            '    volumes:\n'
+            '        - certbot-etc:/etc/letsencrypt\n'
+            '        - certbot-var:/var/lib/letsencrypt\n'
+            '        - web-root:/var/www/html\n'
+            '    depends_on:\n'
+            '        - lost\n'
+            '' + command
+        )
     
     def get_rabbitmq(self):
         return (
@@ -97,13 +118,15 @@ class DockerComposeBuilder(object):
         with open(sotre_path, 'w') as f:
             f.write(content)
 
-    def write_production_file(self, store_path, add_lostcv=True):
+    def write_production_file(self, store_path, add_lostcv=True, cert=None):
         content = self.get_header()
         content += self.get_lost()
         content += self.get_lostdb()
         content += self.get_rabbitmq()
         if add_lostcv:
             content += self.get_lostcv()
+        if cert:
+            content += self.get_cert(cert)
         self._write_file(store_path, content)
 
 class QuickSetup(object):
@@ -113,6 +136,10 @@ class QuickSetup(object):
         self.secret_key = gen_rand_string(16)
         self.dst_data_dir = os.path.join(args.install_path, 'data')
         self.dst_docker_dir = os.path.join(args.install_path, 'docker')
+        self.dst_webroot_dir = os.path.join(args.install_path, 'web-root')
+        self.dst_certbotetc_dir = os.path.join(args.install_path, 'certbot-etc')
+        self.dst_certbotvar_dir = os.path.join(args.install_path, 'certbot-var')
+        self.cert_status = args.cert
         if args.release is None:
             self.release = lost.__version__
         else:
@@ -224,6 +251,12 @@ class QuickSetup(object):
         logging.info('Created: {}'.format(self.dst_data_dir))
         os.makedirs(self.dst_docker_dir)
         logging.info('Created: {}'.format(self.dst_docker_dir))
+        os.makedirs(self.dst_webroot_dir)
+        logging.info('Created: {}'.format(self.dst_webroot_dir))
+        os.makedirs(self.dst_certbotetc_dir)
+        logging.info('Created: {}'.format(self.dst_certbotetc_dir))
+        os.makedirs(self.dst_certbotvar_dir)
+        logging.info('Created: {}'.format(self.dst_certbotvar_dir))
         # example_config_path = '../compose/prod-docker-compose.yml'
         dst_config = os.path.join(self.dst_docker_dir, 'docker-compose.yml')
         # shutil.copy(example_config_path, dst_config)
@@ -253,6 +286,7 @@ class QuickSetup(object):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Quick setup for lost on linux')
     parser.add_argument('install_path', help='Specify path to install lost.')
+    parser.add_argument('cert', help='Specify what is the cert status', default=None, choices=['staging', 'prod'])
     parser.add_argument('--release', help='LOST release you want to install.', default=None)
     parser.add_argument('-gpu', '--add_gpu_worker', help='Create also config files for a local gpu worker', action='store_true')
     parser.add_argument('-noai', '--no_ai', help='Do not add ai examples and no lost-cv worker', action='store_true')
