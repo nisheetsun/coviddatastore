@@ -148,7 +148,7 @@ class QuickSetup(object):
     def write_docker_compose(self, store_path):
         builder = DockerComposeBuilder()
         if self.args.no_ai or self.args.add_gpu_worker:
-            builder.write_production_file(store_path, add_lostcv=False)
+            builder.write_production_file(store_path, add_lostcv=False, cert=self.cert_status)
         else:
             builder.write_production_file(store_path, add_lostcv=True)
         logging.info('Wrote docker-compose config to: {}'.format(store_path))
