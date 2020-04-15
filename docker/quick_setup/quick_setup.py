@@ -34,9 +34,9 @@ class DockerComposeBuilder(object):
             '        - .env\n'
             '      volumes:\n'
             '        - ${LOST_DATA}:/home/lost\n'
-            '        - web-root:/var/www/html\n'
-            '        - certbot-etc:/etc/letsencrypt\n'
-            '        - certbot-var:/var/lib/letsencrypt\n'
+            '        - ${LOST_DATA}/web-root:/var/www/html\n'
+            '        - ${LOST_DATA}/certbot-etc:/etc/letsencrypt\n'
+            '        - ${LOST_DATA}/certbot-var:/var/lib/letsencrypt\n'
             '      restart: always\n'
             '      ports:\n'
             '        - "80:80"\n'
@@ -136,9 +136,9 @@ class QuickSetup(object):
         self.secret_key = gen_rand_string(16)
         self.dst_data_dir = os.path.join(args.install_path, 'data')
         self.dst_docker_dir = os.path.join(args.install_path, 'docker')
-        self.dst_webroot_dir = os.path.join(args.install_path, 'web-root')
-        self.dst_certbotetc_dir = os.path.join(args.install_path, 'certbot-etc')
-        self.dst_certbotvar_dir = os.path.join(args.install_path, 'certbot-var')
+        self.dst_webroot_dir = os.path.join(self.dst_data_dir, 'web-root')
+        self.dst_certbotetc_dir = os.path.join(self.dst_data_dir, 'certbot-etc')
+        self.dst_certbotvar_dir = os.path.join(self.dst_data_dir, 'certbot-var')
         self.cert_status = args.cert
         if args.release is None:
             self.release = lost.__version__
