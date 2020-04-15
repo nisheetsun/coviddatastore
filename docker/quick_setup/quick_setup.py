@@ -89,20 +89,20 @@ class DockerComposeBuilder(object):
 
     def get_cert(self, cert):
         if cert == 'staging':
-            command = '    command: certonly --webroot --webroot-path=/var/www/html --email sherin@tensorwerk.com --agree-tos --no-eff-email --staging -d coviddata.store  -d www.coviddata.store\n\n'
+            command = '        command: certonly --webroot --webroot-path=/var/www/html --email sherin@tensorwerk.com --agree-tos --no-eff-email --staging -d coviddata.store  -d www.coviddata.store\n\n'
         else:
-            command = '    command: certonly --webroot --webroot-path=/var/www/html --email sherin@tensorwerk.com --agree-tos --no-eff-email -d coviddata.store  -d www.coviddata.store\n\n'
+            command = '        command: certonly --webroot --webroot-path=/var/www/html --email sherin@tensorwerk.com --agree-tos --no-eff-email -d coviddata.store  -d www.coviddata.store\n\n'
         return (
             '    certbot:\n'
-            '    image: certbot/certbot\n'
-            '    container_name: certbot\n'
-            '    volumes:\n'
-            '        - ${LOST_DATA}/certbot-etc:/etc/letsencrypt\n'
-            '        - ${LOST_DATA}/certbot-var:/var/lib/letsencrypt\n'
-            '        - ${LOST_DATA}/web-root:/var/www/html\n'
-            '    depends_on:\n'
-            '        - lost\n'
-            '' + command
+            '        image: certbot/certbot\n'
+            '        container_name: certbot\n'
+            '        volumes:\n'
+            '            - ${LOST_DATA}/certbot-etc:/etc/letsencrypt\n'
+            '            - ${LOST_DATA}/certbot-var:/var/lib/letsencrypt\n'
+            '            - ${LOST_DATA}/web-root:/var/www/html\n'
+            '        depends_on:\n'
+            '            - lost\n'
+            '        ' + command
         )
     
     def get_rabbitmq(self):
