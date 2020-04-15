@@ -97,9 +97,9 @@ class DockerComposeBuilder(object):
             '    image: certbot/certbot\n'
             '    container_name: certbot\n'
             '    volumes:\n'
-            '        - certbot-etc:/etc/letsencrypt\n'
-            '        - certbot-var:/var/lib/letsencrypt\n'
-            '        - web-root:/var/www/html\n'
+            '        - ${LOST_DATA}/certbot-etc:/etc/letsencrypt\n'
+            '        - ${LOST_DATA}/certbot-var:/var/lib/letsencrypt\n'
+            '        - ${LOST_DATA}/web-root:/var/www/html\n'
             '    depends_on:\n'
             '        - lost\n'
             '' + command
