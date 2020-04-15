@@ -286,7 +286,7 @@ class QuickSetup(object):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Quick setup for lost on linux')
     parser.add_argument('install_path', help='Specify path to install lost.')
-    parser.add_argument('cert', help='Specify what is the cert status', default=None, choices=['staging', 'prod'])
+    parser.add_argument('--cert', help='Specify what is the cert status', default=None, choices=['staging', 'prod'])
     parser.add_argument('--release', help='LOST release you want to install.', default=None)
     parser.add_argument('-gpu', '--add_gpu_worker', help='Create also config files for a local gpu worker', action='store_true')
     parser.add_argument('-noai', '--no_ai', help='Do not add ai examples and no lost-cv worker', action='store_true')
