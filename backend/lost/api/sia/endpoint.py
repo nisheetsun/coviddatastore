@@ -142,7 +142,10 @@ class Update(Resource):
                 label = each_polygon['labelIds'][0]
                 all_polygon[label] = np.array(polygon_coordinates)
             ann[data['imgId']] = all_polygon
-            co.commit('added annotation')
+            try:
+                co.commit('added annotation')
+            except RuntimeError:
+                logger.critical("No changes found to commit")
             # ========================================================
             re = sia.update(dbm, data, user.idx)
             dbm.close_session()

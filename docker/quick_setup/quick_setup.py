@@ -37,7 +37,7 @@ class DockerComposeBuilder(object):
             '        - ${LOST_DATA}/web-root:/var/www/html\n'
             '        - ${LOST_DATA}/certbot-etc:/etc/letsencrypt\n'
             '        - ${LOST_DATA}/certbot-var:/var/lib/letsencrypt\n'
-            '        - ${LOST_DATA}/dhparam:/etc/ssl/certs'
+            '        - ${LOST_DATA}/dhparam:/etc/ssl/certs\n'
             '      restart: always\n'
             '      ports:\n'
             '        - "80:80"\n'
