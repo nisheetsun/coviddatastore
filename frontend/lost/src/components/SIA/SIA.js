@@ -151,6 +151,7 @@ class SIA extends Component {
             labels={this.props.possibleLabels}
             colors={colors}
             imageUrl={this.state.image.data}
+            imageId={this.state.image.id}
             prevImage={()=>{
               this.props.siaGetPrevImage(this.state.image.id)
             }}

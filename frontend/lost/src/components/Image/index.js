@@ -63,7 +63,7 @@ export default class Image extends React.Component {
 
       rows_columns_data: {},
       coordinates_data: {},
-      final_data: [],
+      // final_data: [],
 
       points_to_label_mapping: [{}, {}],
       value: { label: null, id: null },
@@ -78,7 +78,7 @@ export default class Image extends React.Component {
         history_coordinates: [[], []],
         rows_columns_data: {},
         coordinates_data: {},
-        final_data: [],
+        // final_data: [],
         points_to_label_mapping: [{}, {}],
         imageLoaded: false,
         value: { label: null, id: null },
@@ -139,27 +139,29 @@ export default class Image extends React.Component {
       coordinates_data: _coordinates_data
     });
 
-    let _final_data = this.state.final_data;
-    for (let i of hovered_coordinates[0]) {
-      _final_data.push({
-        type: "polygon",
-        data: { x: i[0], y: i[1] },
-        mode: "editLabel",
-        status: "new",
-        labelIds: [this.state.value.id],
-        selectedNode: 0
-      });
-    }
-    for (let i of hovered_coordinates[1]) {
-      _final_data.push({
-        type: "polygon",
-        data: { x: i[0], y: i[1] },
-        mode: "editLabel",
-        status: "new",
-        labelIds: [this.state.value.id],
-        selectedNode: 0
-      });
-    }
+    // let _final_data = this.state.final_data;
+    // for (let i of hovered_coordinates[0]) {
+    //   _final_data.push({
+    //     "x": i[0], "y": i[1]
+
+    //     // type: "polygon",
+    //     // data: { x: i[0], y: i[1] },
+    //     // mode: "editLabel",
+    //     // status: "new",
+    //     // labelIds: [this.state.value.id],
+    //     // selectedNode: 0
+    //   });
+    // }
+    // for (let i of hovered_coordinates[1]) {
+    //   _final_data.push({
+    //     type: "polygon",
+    //     data: { x: i[0], y: i[1] },
+    //     mode: "editLabel",
+    //     status: "new",
+    //     labelIds: [this.state.value.id],
+    //     selectedNode: 0
+    //   });
+    // }
   };
 
   changePointsLabels = () => {
@@ -222,24 +224,38 @@ export default class Image extends React.Component {
   };
 
   postAnnotationAsync = () => {
-    let data = {};
-    data = {
-      imgId: 3,
+    let payload;
+    let data = [];
+    let label_data = {}
+    for (let key in this.state.coordinates_data) {
+      label_data = {'labelIds': [key],
+                  'mode': 'view',
+                  'status': 'new',
+                  'type': 'polygon',
+                  'data':[]}
+      for (let co of this.state.coordinates_data[key]){
+        label_data['data'].push({"x":co[0], "y":co[1]})
+      }
+      data.push(label_data)
+    }
+    payload = {
+      imgId: this.props.imageId,
       imgLabelIds: [],
       imgLabelChanged: false,
       annotations: {
         bBoxes: [],
         lines: [],
         points: [],
-        polygons: this.state.final_data
+        polygons: data
       },
       isJunk: null
     };
     this.setState({ posting: true });
+
     return axios
       .post(
         API_URL + "/sia/update",
-        data
+        payload
       )
       .then(response => {
         return response;
@@ -444,7 +460,7 @@ export default class Image extends React.Component {
                   alert("unsaved data");
                 } else {
                   // this.reset(this.props.nextImage);
-                  if(this.state.final_data.length){
+                  if(Object.keys(this.state.coordinates_data).length !== 0){
                     this.postAnnotationAsync().then(data => {
                       this.setState({ posting: false }, () => {
                         this.reset(this.props.nextImage);
