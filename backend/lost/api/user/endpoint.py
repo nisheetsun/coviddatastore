@@ -16,6 +16,7 @@ from flaskapp import blacklist
 import logging
 import hangar
 from pathlib import Path
+import numpy as np
 logger = logging.getLogger(__name__)
 namespace = api.namespace('user', description='Users in System.')
 
