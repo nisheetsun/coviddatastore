@@ -150,6 +150,7 @@ class SIA extends Component {
           <ImageComponent
             labels={this.props.possibleLabels}
             colors={colors}
+            annos={this.props.annos}
             imageUrl={this.state.image.data}
             imageId={this.state.image.id}
             prevImage={()=>{
