@@ -16,6 +16,7 @@ let hovered_coordinates = [[], []];
 
 // {"imgId":3,"imgLabelIds":[],"imgLabelChanged":false,"annotations":{"bBoxes":[],"lines":[],"points":[{"type":"point","data":{"x":0.3122846765714825,"y":0.4170911048166566},"mode":"view","status":"new","labelIds":[35],"selectedNode":0},{"type":"point","data":{"x":0.6858377243959223,"y":0.3039049115771725},"mode":"view","status":"new","labelIds":[35],"selectedNode":0},{"type":"point","data":{"x":0.5839596204438023,"y":0.5727221205209473},"mode":"view","status":"new","labelIds":[36],"selectedNode":0}],"polygons":[]},"isJunk":null}
 // http://localhost/api/sia/update
+// {"imgId":13,"imgLabelIds":[],"imgLabelChanged":false,"annotations":{"bBoxes":[],"lines":[],"points":[],"polygons":[{"type":"polygon","data":[{"x":0.25513675614361775,"y":0.31026252983293556},{"x":0.4264470612919301,"y":0.4128878281622912},{"x":0.1974087964541426,"y":0.711217183770883},{"x":0.1974087964541426,"y":0.711217183770883}],"mode":"editLabel","status":"new","labelIds":[35],"selectedNode":3}]},"isJunk":null}
 
 function MyVerticallyCenteredModal(props) {
   return (
@@ -141,9 +142,9 @@ export default class Image extends React.Component {
     let _final_data = this.state.final_data;
     for (let i of hovered_coordinates[0]) {
       _final_data.push({
-        type: "point",
+        type: "polygon",
         data: { x: i[0], y: i[1] },
-        mode: "view",
+        mode: "editLabel",
         status: "new",
         labelIds: [this.state.value.id],
         selectedNode: 0
@@ -151,9 +152,9 @@ export default class Image extends React.Component {
     }
     for (let i of hovered_coordinates[1]) {
       _final_data.push({
-        type: "point",
+        type: "polygon",
         data: { x: i[0], y: i[1] },
-        mode: "view",
+        mode: "editLabel",
         status: "new",
         labelIds: [this.state.value.id],
         selectedNode: 0
@@ -229,8 +230,8 @@ export default class Image extends React.Component {
       annotations: {
         bBoxes: [],
         lines: [],
-        points: this.state.final_data,
-        polygons: []
+        points: [],
+        polygons: this.state.final_data
       },
       isJunk: null
     };
@@ -238,7 +239,7 @@ export default class Image extends React.Component {
     return axios
       .post(
         API_URL + "/sia/update",
-        JSON.stringify(data)
+        data
       )
       .then(response => {
         return response;
