@@ -1,16 +1,21 @@
 import React from "react";
+import axios from "axios";
 import Button from "react-bootstrap/Button";
 import Modal from "react-bootstrap/Modal";
+import Spinner from "react-bootstrap/Spinner";
+
+import { API_URL } from "../../settings";
 
 import "./index.css";
 import Grid from "../Grid";
 
 let colors = {};
-let label_id_to_label = {}
+let label_id_to_label = {};
 let hovered_points = [[], []];
 let hovered_coordinates = [[], []];
 
 // {"imgId":3,"imgLabelIds":[],"imgLabelChanged":false,"annotations":{"bBoxes":[],"lines":[],"points":[{"type":"point","data":{"x":0.3122846765714825,"y":0.4170911048166566},"mode":"view","status":"new","labelIds":[35],"selectedNode":0},{"type":"point","data":{"x":0.6858377243959223,"y":0.3039049115771725},"mode":"view","status":"new","labelIds":[35],"selectedNode":0},{"type":"point","data":{"x":0.5839596204438023,"y":0.5727221205209473},"mode":"view","status":"new","labelIds":[36],"selectedNode":0}],"polygons":[]},"isJunk":null}
+// http://localhost/api/sia/update
 
 function MyVerticallyCenteredModal(props) {
   return (
@@ -49,6 +54,7 @@ export default class Image extends React.Component {
       imageDimentions: { width: null, height: null },
       boxDimention: { width: null, height: null },
       modalShow: false,
+      posting: false,
 
       history_row_columns: [[], []],
       history_coordinates: [[], []],
@@ -56,6 +62,7 @@ export default class Image extends React.Component {
 
       rows_columns_data: {},
       coordinates_data: {},
+      final_data: [],
 
       points_to_label_mapping: [{}, {}],
       value: { label: null, id: null },
@@ -70,6 +77,7 @@ export default class Image extends React.Component {
         history_coordinates: [[], []],
         rows_columns_data: {},
         coordinates_data: {},
+        final_data: [],
         points_to_label_mapping: [{}, {}],
         imageLoaded: false,
         value: { label: null, id: null },
@@ -129,6 +137,28 @@ export default class Image extends React.Component {
       rows_columns_data: _rows_columns_data,
       coordinates_data: _coordinates_data
     });
+
+    let _final_data = this.state.final_data;
+    for (let i of hovered_coordinates[0]) {
+      _final_data.push({
+        type: "point",
+        data: { x: i[0], y: i[1] },
+        mode: "view",
+        status: "new",
+        labelIds: [this.state.value.id],
+        selectedNode: 0
+      });
+    }
+    for (let i of hovered_coordinates[1]) {
+      _final_data.push({
+        type: "point",
+        data: { x: i[0], y: i[1] },
+        mode: "view",
+        status: "new",
+        labelIds: [this.state.value.id],
+        selectedNode: 0
+      });
+    }
   };
 
   changePointsLabels = () => {
@@ -174,29 +204,60 @@ export default class Image extends React.Component {
       hovered_points = [[], []];
       hovered_coordinates = [[], []];
     } else {
-      alert("nothing selected");
     }
     // this.setState({ label: null });
   };
 
   addToHoveredPoints = (x, y, row, column, grid_number) => {
-    x = x - this.myRef.current.getBoundingClientRect().left
-    console.log("$$$$$", x)
-    hovered_points[grid_number].push([row, column]);
-    hovered_coordinates[grid_number].push([x, y]);
+    // if(y > this.state.imageDimentions.height){}else{
+      x = x - this.myRef.current.getBoundingClientRect().left;
+      hovered_points[grid_number].push([row, column]);
+      hovered_coordinates[grid_number].push([x, y]);
+    // }
   };
 
   setModalShow = value => {
     this.setState({ modalShow: value });
   };
 
+  postAnnotationAsync = () => {
+    let data = {};
+    data = {
+      imgId: 3,
+      imgLabelIds: [],
+      imgLabelChanged: false,
+      annotations: {
+        bBoxes: [],
+        lines: [],
+        points: this.state.final_data,
+        polygons: []
+      },
+      isJunk: null
+    };
+    this.setState({ posting: true });
+    return axios
+      .post(
+        API_URL + "/sia/update",
+        JSON.stringify(data)
+      )
+      .then(response => {
+        return response;
+      })
+      .catch(e => {
+        return e;
+      });
+    // return axios.get(API_URL + '/sia/label').then((response)=>{return response}).catch(e=> {return e} )
+  };
+
   render() {
-    console.log(
-      "!!!!IMAGE",
-      this.state.rows_columns_data,
-      this.state.coordinates_data,
-      hovered_points
-    );
+    // console.log(
+    //   "!!!!IMAGE",
+    //   this.state.rows_columns_data,
+    //   this.state.coordinates_data,
+    //   hovered_points,
+    //   this.state.final_data,
+    //   this.state.imageDimentions
+    // );
     return (
       <div style={{ backgroundColor: "grey" }}>
         <div
@@ -293,6 +354,7 @@ export default class Image extends React.Component {
           >
             <Button
               type="button"
+              disabled={this.state.posting}
               onClick={() => {
                 if (hovered_points[0].length || hovered_points[1].length) {
                   alert("unsaved data");
@@ -319,7 +381,7 @@ export default class Image extends React.Component {
                     } else {
                       label_id_to_label[value.id] = value.label;
                     }
-                    
+
                     return (
                       <div className="input-screen">
                         <input
@@ -375,15 +437,35 @@ export default class Image extends React.Component {
 
             <Button
               type="button"
+              disabled={this.state.posting}
               onClick={() => {
                 if (hovered_points[0].length || hovered_points[1].length) {
                   alert("unsaved data");
                 } else {
-                  this.reset(this.props.nextImage);
+                  // this.reset(this.props.nextImage);
+                  if(this.state.final_data.length){
+                    this.postAnnotationAsync().then(data => {
+                      this.setState({ posting: false }, () => {
+                        this.reset(this.props.nextImage);
+                      });
+                    });
+                  }else{
+                    this.reset(this.props.nextImage);
+                  }
                 }
               }}
             >
-              Next Image
+              {this.state.posting ? (
+                <Spinner
+                  as="span"
+                  animation="border"
+                  size="sm"
+                  role="status"
+                  aria-hidden="true"
+                />
+              ) : (
+                "Next Image"
+              )}
             </Button>
           </div>
         ) : null}

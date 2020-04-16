@@ -36,6 +36,7 @@ export default class Grid extends React.Component {
           row_column={num_columns.toString() + "_" + i.toString()}
           addToHoveredPoints={this.props.addToHoveredPoints}
           is_mousedown={this.props.is_mousedown}
+          imageDimentions={this.props.imageDimentions}
         />
       );
     }

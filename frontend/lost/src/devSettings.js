@@ -11,6 +11,7 @@ if(DEV){
 } else {
 	API_URL = `${window.location.origin}/api`
 }
+// API_URL = "https://coviddata.store/api/"
 export { API_URL }
 
 export const roles = ['Designer', 'Annotater']
