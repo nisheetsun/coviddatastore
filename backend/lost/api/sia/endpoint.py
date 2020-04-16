@@ -11,25 +11,40 @@ import hangar
 import numpy as np
 import json
 import logging
+from pathlib import Path
 logger = logging.getLogger(__name__)
 
 namespace = api.namespace('sia', description='SIA Annotation API.')
 
 
-repo = hangar.Repository('/home/lost/')
-if not repo.initialized:
-    repo.init(user_name='Sherin', user_email='sherin@tensorwerk.com')
-    co = repo.checkout(write=True)
-    path = co.add_str_column('paths')
-    ann = co.add_ndarray_column('annotations', contains_subsamples=True, dtype=np.float64,
-                                variable_shape=True, shape=(200, 2))
-    co.commit('Added columns')
-else:
-    if repo.writer_lock_held:
-        repo.force_release_writer_lock()
-    co = repo.checkout(write=True)
-    path = co.columns['paths']
-    ann = co.columns['annotations']
+_global_checkout_map = {}
+
+
+def get_checkout(identity):
+    co = _global_checkout_map.get(identity)
+    if co is None:
+        repo = get_repo(identity)
+        co = repo.checkout(write=True)
+        _global_checkout_map[identity] = co
+    return co
+
+
+def get_repo(identity):
+    path = Path('/home/lost/') / str(identity)
+    path.mkdir(exist_ok=True)
+    repo = hangar.Repository(path)
+    if not repo.initialized:
+        repo.init(user_name=str(identity) + '_placeholder', user_email='placeholder@email.com')
+        co = repo.checkout(write=True)
+        co.add_str_column('paths')
+        co.add_ndarray_column('annotations', contains_subsamples=True, dtype=np.float64,
+                              variable_shape=True, shape=(200, 2))
+        co.commit('Added columns')
+        co.close()
+    else:
+        if repo.writer_lock_held:
+            repo.force_release_writer_lock()
+    return repo
 
 
 @namespace.route('/first')
@@ -70,6 +85,8 @@ class Next(Resource):
             # ======================== Hangar update ========================
             imid = re['image']['id']
             imurl = re['image']['url']
+            co = get_checkout(identity)
+            path = co['paths']
             if imid not in path:
                 path[imid] = imurl
                 co.commit('Addding path')
@@ -133,6 +150,8 @@ class Update(Resource):
             data = json.loads(request.data)
             # ================ Hangar Update =====================
             all_polygon = {}
+            co = get_checkout(identity)
+            ann = co['annotations']
             for each_polygon in data['annotations']['polygons']:
                 polygon_coordinates = []
                 coordinate_list = each_polygon['data']
@@ -144,8 +163,8 @@ class Update(Resource):
             ann[data['imgId']] = all_polygon
             try:
                 co.commit('added annotation')
-            except RuntimeError:
-                logger.critical("No changes found to commit")
+            except RuntimeError as e:
+                logger.exception("No changes found to commit")
             # ========================================================
             re = sia.update(dbm, data, user.idx)
             dbm.close_session()

@@ -14,6 +14,7 @@ from lost.logic.pipeline import service as pipeline_service
 from lost.logic import anno_task as annotask_service
 from flaskapp import blacklist
 import logging
+import hangar
 from pathlib import Path
 logger = logging.getLogger(__name__)
 namespace = api.namespace('user', description='Users in System.')
@@ -82,7 +83,22 @@ class UserList(Resource):
 
         if user:
             return {'message': 'User already exists.'}, 401
-        else: 
+        else:
+            # ################# Hangar #############
+            path = Path('/home/lost/') / str(identity)
+            path.mkdir(exist_ok=True)
+            repo = hangar.Repository(path)
+            if not repo.initialized:
+                uname = '{}_{}'.format(identity, data['user_name'])
+                email = data['email'] if data['email'] else 'placeholder@email.com'
+                repo.init(user_name=uname, user_email=email)
+                co = repo.checkout(write=True)
+                co.add_str_column('paths')
+                co.add_ndarray_column('annotations', contains_subsamples=True, dtype=np.float64,
+                                      variable_shape=True, shape=(200, 2))
+                co.commit('Added columns')
+                co.close()
+            # ######################################
             user = DBUser(
             user_name = data['user_name'],
             email = data['email'],
