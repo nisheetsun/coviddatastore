@@ -6,6 +6,8 @@ from lost.logic.template import combine_arguments
 from lost.logic import file_man
 from lost.utils.dump import dump
 __author__ = "Gereon Reus"
+import logging
+logger = logging.getLogger(__name__)
 
 ############################ start ################################
 #                                                                 #
@@ -13,6 +15,10 @@ __author__ = "Gereon Reus"
 
 
 def start(db_man, data, manager_id, group_id):
+    logger.critical(']]]]]]]]]]]]]]]]]]]]]] Pipeline Start ]]]]]]]]]]]]]]]]]]]')
+    logger.critical(data)
+    logger.critical(manager_id)
+    logger.critical(group_id)
     # data = json.loads(data)
     # load template
     template = db_man.get_pipe_template(data['templateId'])
@@ -25,6 +31,7 @@ def start(db_man, data, manager_id, group_id):
     # and certain elements
     patch_pe(db_man, pipe_starter)
     db_man.save_obj(pipe_starter.unlock_pipe())
+    logger.critical("Done from pipelinestart: {}".format(pipe_starter.pipe.idx))
     return pipe_starter.pipe.idx
     
 def create_pe_raw_element(db_man, pipe_starter):

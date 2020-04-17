@@ -1,7 +1,7 @@
 version: '2'
 services:
     lost:
-      image: l3pcv/lost-test:${LOST_VERSION}
+      image: tensorwerk/hangarlost
       container_name: lost
       command: bash /entrypoint.sh
       env_file:
@@ -24,52 +24,18 @@ services:
       image: mysql:5.7
       container_name: db-lost
       volumes:
-        - ${LOST_DATA}/mysql:/var/lib/mysql
+          - ${LOST_DATA}/mysql:/var/lib/mysql
       restart: always
       environment:
-        MYSQL_DATABASE: ${LOST_DB_NAME}
-        MYSQL_USER: ${LOST_DB_USER}
-        MYSQL_PASSWORD: ${LOST_DB_PASSWORD}
-        MYSQL_ROOT_PASSWORD: ${LOST_DB_ROOT_PASSWORD}
-
-    lost-cv:
-      image: l3pcv/lost-cv:latest
-      container_name: lost-cv
-      command: bash /entrypoint.sh
-      env_file:
-        - .env
-      volumes:
-        - ${LOST_DATA}:/home/lost
-      restart: always
-      environment:
-          PYTHONPATH: "/code/backend"
-          ENV_NAME: "lost-cv"
-          WORKER_NAME: "lost-cv-0"
-          PY3_INIT: "source /opt/conda/bin/activate lost-cv"
-      links:
-        - db-lost
-        - rabbitmqlost
+          MYSQL_DATABASE: ${LOST_DB_NAME}
+          MYSQL_USER: ${LOST_DB_USER}
+          MYSQL_PASSWORD: ${LOST_DB_PASSWORD}
+          MYSQL_ROOT_PASSWORD: ${LOST_DB_ROOT_PASSWORD}
 
     rabbitmqlost:
       image: rabbitmq:3-management
       container_name: rabbitmqlost
       restart: always
       volumes:
-        - ${LOST_DATA}/rabbitmq:/var/lib/rabbitmq
-
-    # For easy db access while dev.
-    phpmyadmin:
-      image: phpmyadmin/phpmyadmin
-      container_name: phpmyadmin
-      restart: always
-      environment:
-        PMA_ARBITRARY: 1
-        MYSQL_USER: ${LOST_DB_USER}
-        MYSQL_PASSWORD: ${LOST_DB_PASSWORD}
-        MYSQL_ROOT_PASSWORD: ${LOST_DB_ROOT_PASSWORD}
-      links:
-        - "db-lost:db"
-      ports:
-        - "8081:80"
-
+          - ${LOST_DATA}/rabbitmq:/var/lib/rabbitmq
 

@@ -6,7 +6,8 @@ from lost.settings import LOST_CONFIG, FLASK_DEBUG
 from lost.db import access, roles
 from lost.api.annotask.parsers import annotask_parser
 from lost.logic import anno_task as annotask_service
-
+import logging
+logger = logging.getLogger(__name__)
 
 namespace = api.namespace('annotask', description='AnnoTask API.')
 
@@ -30,12 +31,18 @@ class Available(Resource):
             #with open('/code/backend/lost/api/annotask/test/annoTasks.json') as f:
             #    data = json.load(f)
             #return data
+            logger.critical('------------ Annotask -------------')
+            logger.critical(annotask_list)
+            logger.critical(group_ids)
+            logger.critical(identity)
             return annotask_list
 
     @api.expect(annotask_parser)
     @jwt_required 
     def post(self):
         args = annotask_parser.parse_args(request)
+        logger.critical('------------ annotask post ----------------')
+        logger.critical(args)
         dbm = access.DBMan(LOST_CONFIG)
         identity = get_jwt_identity()
         user = dbm.get_user_by_id(identity)
@@ -65,6 +72,8 @@ class Working(Resource):
             #with open('/code/backend/lost/api/annotask/test/workingOnAnnoTask.json') as f:
             #    data = json.load(f)
             #return data
+            logger.critical('-------------- annotask working -----------------')
+            logger.critical(working_task)
             return working_task
 
 
