@@ -147,6 +147,8 @@ class Update(Resource):
             return "You need to be {} in order to perform this request.".format(roles.ANNOTATOR), 401
 
         else:
+            logger.critical('+++++++++++++++ Sia update request.data +++++++++++++')
+            logger.critical(request.data)
             data = json.loads(request.data)
             # ================ Hangar Update =====================
             all_polygon = {}
