@@ -22,6 +22,8 @@ export default class Grid extends React.Component {
     for (i = 0; i < _num; i++) {
       _list.push(
         <Point
+          colors={this.props.colors}
+          static_data={this.props.static_data}
           xMargin={this.props.xMargin}
           color={this.props.color}
           label={this.props.label}
@@ -45,7 +47,9 @@ export default class Grid extends React.Component {
 
   renderRow = () => {
     let _num = Math.floor(this.props.imageDimentions.height / 20);
+    // let _num = 9
     let num_rows = Math.floor(this.props.imageDimentions.width / 12) - 1;
+    // let num_rows = 2;
     let _list = [];
     let i = 0;
     for (i = 0; i < _num-1; i++) {
@@ -55,7 +59,7 @@ export default class Grid extends React.Component {
           style={{}}
           onMouseDown={() => {}}
         >
-          {this.renderColumn(i, num_rows)}
+          {this.props.static_data.imageUrl?this.renderColumn(i, num_rows):null}
         </div>
       );
     }

@@ -8,6 +8,7 @@ import { API_URL } from "../../settings";
 
 import "./index.css";
 import Grid from "../Grid";
+import { state } from "l3p-frontend";
 
 let colors = {};
 let label_id_to_label = {};
@@ -63,6 +64,11 @@ export default class Image extends React.Component {
 
       rows_columns_data: {},
       coordinates_data: {},
+      static_data:{
+        'imageUrl':null,
+        'data':{}
+      },
+      colors:{},
       // final_data: [],
 
       points_to_label_mapping: [{}, {}],
@@ -78,6 +84,10 @@ export default class Image extends React.Component {
         history_coordinates: [[], []],
         rows_columns_data: {},
         coordinates_data: {},
+        static_data:{
+          'imageUrl':null,
+          'data':{}
+        },
         // final_data: [],
         points_to_label_mapping: [{}, {}],
         imageLoaded: false,
@@ -95,6 +105,47 @@ export default class Image extends React.Component {
       imageDimentions: { height: img.offsetHeight, width: img.offsetWidth },
       imageLoaded: true
     });
+  };
+
+  componentDidUpdate = () => {
+    if(this.state.static_data.imageUrl!=this.props.imageUrl){
+      let data = {}
+      if(this.props.annos.annotations.polygons.length){
+        for(let i of this.props.annos.annotations.polygons){
+          
+          for(let j of i.data){
+            if(j.x in data){
+            }else{
+              data[j.x]={}
+            }
+            data[j.x][j.y]=i.labelIds[0]
+          }
+        }
+      }
+      let _colors={}
+      if(Object.keys(this.state.colors).length == 0){
+        if(Object.keys(colors).length == 0){
+          // if (value.label in colors) {
+          // } else {
+          //   colors[value.id] = this.props.colors[index];
+          // }
+          if(this.props.labels.length){
+            for(let i of this.props.labels){
+              // console.log("@@@@@@@labels", i)
+            }
+          }
+        }else{
+          _colors=colors
+        }
+      }
+
+
+      this.setState({
+        static_data:{
+        imageUrl:this.props.imageUrl,
+        data:data}
+        ,colors:_colors})
+    }
   };
 
   setStateWrapper = key_value_dict => {
@@ -268,12 +319,8 @@ export default class Image extends React.Component {
 
   render() {
     // console.log(
-    //   "!!!!IMAGE",
-    //   this.state.rows_columns_data,
-    //   this.state.coordinates_data,
-    //   hovered_points,
-    //   this.state.final_data,
-    //   this.state.imageDimentions
+    //   "!!!!static_data",
+    //   this.state.static_data
     // );
     return (
       <div style={{ backgroundColor: "grey" }}>
@@ -309,6 +356,8 @@ export default class Image extends React.Component {
               {
                 <React.Fragment>
                   <Grid
+                    colors={this.state.colors}
+                    static_data={this.state.static_data}
                     xMargin={this.myRef.current.getBoundingClientRect()["x"]}
                     color={this.state.color}
                     label={this.state.value.label}
@@ -343,6 +392,8 @@ export default class Image extends React.Component {
               {
                 <React.Fragment>
                   <Grid
+                    colors={this.state.colors}
+                    static_data={this.state.static_data}
                     xMargin={this.myRef.current.getBoundingClientRect()["x"]}
                     color={this.state.color}
                     label={this.state.value.label}
