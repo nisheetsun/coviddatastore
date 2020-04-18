@@ -274,7 +274,7 @@ export default class Image extends React.Component {
 
   addToHoveredPoints = (x, y, row, column, grid_number) => {
     // if(y > this.state.imageDimentions.height){}else{
-      x = x - this.myRef.current.getBoundingClientRect().left;
+      // x = x - this.myRef.current.getBoundingClientRect().left;
       hovered_points[grid_number].push([row, column]);
       hovered_coordinates[grid_number].push([x, y]);
     // }
@@ -380,114 +380,32 @@ export default class Image extends React.Component {
     // return axios.get(API_URL + '/sia/label').then((response)=>{return response}).catch(e=> {return e} )
   };
 
+  getHeight = () => {
+    if(this.state.imageDimentions.height && this.myRef.current){
+      return this.myRef.current.getBoundingClientRect()["y"]+window.pageYOffset+this.state.imageDimentions.height
+    }else{
+      return 2000
+    }
+  }
+
   render() {
-    // console.log(
-    //   "!!!!static_data",
-    //   this.props.annos
-    // );
+    console.log(
+      "!!!!static_data",
+      this.props.annos,
+      this.props.imageUrl,
+      this.state.static_data
+    );
     // if(this.myRef.current){
     //   console.log(this.myRef.current.getBoundingClientRect()["y"])
     // }else{
     //   console.log(this.myRef.current)
     // }
+    // if(this.myRef.current){
+      // console.log("@@@@@", this.myRef, "@@@@@@", this.myRef.current.width)
+    // }
     return (
-      <div style={{ backgroundColor: "grey" }}>
+      <div style={{ backgroundColor: "grey", height: this.getHeight()}}>
         <div style={{textAlign:'center', color:'white', marginBottom: 30}}>{this.props.annos.image.url}</div>
-        <div
-          style={{
-            width: 1100,
-            margin: "auto",
-            position: "relative"
-            // borderStyle: "solid",
-            // borderColor: "grey",
-            // borderWidth: 15,
-          }}
-          className="selectDisable"
-        >
-          <img
-            ref={this.myRef}
-            alt="annotation display"
-            onLoad={this.onImgLoad}
-            src={this.props.imageUrl}
-            className="image"
-            draggable="false"
-          />
-          {this.state.imageLoaded ? (
-            <div
-              onMouseDown={e => {
-                this.setStateWrapper({ is_mousedown: true });
-              }}
-              onMouseUp={e => {
-                this.setStateWrapper({ is_mousedown: false });
-              }}
-              className="overlay"
-            >
-              {
-                <React.Fragment>
-                  <Grid
-                    random_offset={this.random_offset}
-                    colors={this.state.colors}
-                    static_data={this.state.static_data}
-                    xMargin={this.myRef.current.getBoundingClientRect()["x"]}
-                    yMargin={this.myRef.current?this.myRef.current.getBoundingClientRect()["y"]:null}
-                    color={this.state.color}
-                    label={this.state.value.label}
-                    label_id={this.state.value.id}
-                    image_url={this.props.imageUrl}
-                    key={"0grid"}
-                    grid_number={0}
-                    points_to_label_mapping={
-                      this.state.points_to_label_mapping[0]
-                    }
-                    removeHoveredPoints={this.removeHoveredPoints}
-                    rows_columns_data={this.state.rows_columns_data}
-                    addToHoveredPoints={this.addToHoveredPoints}
-                    imageDimentions={this.state.imageDimentions}
-                    is_mousedown={this.state.is_mousedown}
-                  />
-                </React.Fragment>
-              }
-            </div>
-          ) : null}
-
-          {this.state.imageLoaded ? (
-            <div
-              onMouseDown={e => {
-                this.setStateWrapper({ is_mousedown: true });
-              }}
-              onMouseUp={e => {
-                this.setStateWrapper({ is_mousedown: false });
-              }}
-              className="overlay-new"
-            >
-              {
-                <React.Fragment>
-                  <Grid
-                    random_offset={this.random_offset}
-                    colors={this.state.colors}
-                    static_data={this.state.static_data}
-                    xMargin={this.myRef.current.getBoundingClientRect()["x"]}
-                    yMargin={this.myRef.current?this.myRef.current.getBoundingClientRect()["y"]:null}
-                    color={this.state.color}
-                    label={this.state.value.label}
-                    label_id={this.state.value.id}
-                    imageUrl={this.props.imageUrl}
-                    key={"1grid"}
-                    grid_number={1}
-                    points_to_label_mapping={
-                      this.state.points_to_label_mapping[1]
-                    }
-                    removeHoveredPoints={this.removeHoveredPoints}
-                    rows_columns_data={this.state.rows_columns_data}
-                    addToHoveredPoints={this.addToHoveredPoints}
-                    imageDimentions={this.state.imageDimentions}
-                    is_mousedown={this.state.is_mousedown}
-                  />
-                </React.Fragment>
-              }
-            </div>
-          ) : null}
-        </div>
         {this.state.imageLoaded ? (
           <div
             style={{ marginTop: 10, marginBottom: 20 }}
@@ -579,6 +497,103 @@ export default class Image extends React.Component {
             
           </div>
         ) : null}
+        <div
+          style={{
+            width: 1100,
+            margin: "auto",
+            position: "relative",
+            backgroundColor: 'grey'
+            // borderStyle: "solid",
+            // borderColor: "grey",
+            // borderWidth: 15,
+          }}
+          className="selectDisable"
+        >
+          <img
+            ref={this.myRef}
+            alt="annotation display"
+            onLoad={this.onImgLoad}
+            src={this.props.imageUrl}
+            className="image"
+            draggable="false"
+          />
+          {this.state.imageLoaded ? (
+            <div
+              onMouseDown={e => {
+                this.setStateWrapper({ is_mousedown: true });
+              }}
+              onMouseUp={e => {
+                this.setStateWrapper({ is_mousedown: false });
+              }}
+              className="overlay"
+            >
+              {
+                <React.Fragment>
+                  <Grid
+                    random_offset={this.random_offset}
+                    colors={this.state.colors}
+                    static_data={this.state.static_data}
+                    xMargin={this.myRef.current.getBoundingClientRect()["x"]}
+                    yMargin={this.myRef.current?this.myRef.current.getBoundingClientRect()["y"]:null}
+                    color={this.state.color}
+                    label={this.state.value.label}
+                    label_id={this.state.value.id}
+                    image_url={this.props.imageUrl}
+                    key={"0grid"}
+                    grid_number={0}
+                    points_to_label_mapping={
+                      this.state.points_to_label_mapping[0]
+                    }
+                    removeHoveredPoints={this.removeHoveredPoints}
+                    rows_columns_data={this.state.rows_columns_data}
+                    addToHoveredPoints={this.addToHoveredPoints}
+                    imageDimentions={this.state.imageDimentions}
+                    is_mousedown={this.state.is_mousedown}
+                  />
+                </React.Fragment>
+              }
+            </div>
+          ) : null}
+
+          {this.state.imageLoaded ? (
+            <div
+              onMouseDown={e => {
+                this.setStateWrapper({ is_mousedown: true });
+              }}
+              onMouseUp={e => {
+                this.setStateWrapper({ is_mousedown: false });
+              }}
+              className="overlay-new"
+            >
+              {
+                <React.Fragment>
+                  <Grid
+                    random_offset={this.random_offset}
+                    colors={this.state.colors}
+                    static_data={this.state.static_data}
+                    xMargin={this.myRef.current.getBoundingClientRect()["x"]}
+                    yMargin={this.myRef.current?this.myRef.current.getBoundingClientRect()["y"]:null}
+                    color={this.state.color}
+                    label={this.state.value.label}
+                    label_id={this.state.value.id}
+                    imageUrl={this.props.imageUrl}
+                    key={"1grid"}
+                    grid_number={1}
+                    points_to_label_mapping={
+                      this.state.points_to_label_mapping[1]
+                    }
+                    removeHoveredPoints={this.removeHoveredPoints}
+                    rows_columns_data={this.state.rows_columns_data}
+                    addToHoveredPoints={this.addToHoveredPoints}
+                    imageDimentions={this.state.imageDimentions}
+                    is_mousedown={this.state.is_mousedown}
+                  />
+                </React.Fragment>
+              }
+            </div>
+          ) : null}
+        </div>
+        
       </div>
     );
   }

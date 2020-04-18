@@ -5,4 +5,7 @@ span {
   margin-right: 10px;
   position: relative;
   z-index: 10;
+  /* border-width: 1;
+  border-style: solid;
+  border-color: blue; */
 }

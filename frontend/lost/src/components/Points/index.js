@@ -33,8 +33,14 @@ export default class Point extends React.Component {
 
   isPresent(x, y, data){
     y = y+window.pageYOffset
-      for(let i=x-1.5; i<=x+1.5;i=i+0.5){
-        for(let j=y-1.5; j<=y+1.5;j=j+0.5){
+    if(y==380 && x>500 && x< 560){
+      console.log(x, y, "!")
+    }
+    if(x>555 && x < 610 && y>365 && y<460){
+      console.log(x, y)
+    }
+      for(let i=x-2; i<=x+2;i=i+0.5){
+        for(let j=y-2; j<=y+2;j=j+0.5){
           if(i in data && j in data[i]){
             return data[i][j]
           }
@@ -54,6 +60,7 @@ export default class Point extends React.Component {
 
   onHover = e => {
     const yMargin = this.props.yMargin+window.pageYOffset
+    let xx = this.myRef.current.getBoundingClientRect();
     if (
       this.props.is_mousedown &&
       this.state.label === null &&
@@ -61,9 +68,10 @@ export default class Point extends React.Component {
     ) {
       if (this.props.color) {
         if(e.pageY<=(this.props.imageDimentions.height+yMargin)){
+          console.log(xx.x, xx.y+window.pageYOffset, xx.x-this.props.xMargin, xx.y-yMargin+window.pageYOffset, xx.x-e.pageX, xx.y+window.pageYOffset-e.pageY,  "!!!!!!!!!!!!!!!!!!!!!!!", e.pageX-this.props.xMargin, e.pageY-yMargin, e.pageX, e.pageY, this.props.xMargin, yMargin)
           this.setStateWrapper({ backgroundColor: this.props.color });
           this.props.addToHoveredPoints(
-            e.pageX,
+            e.pageX-this.props.xMargin,
             e.pageY-yMargin,
             parseInt(this.row),
             parseInt(this.column),

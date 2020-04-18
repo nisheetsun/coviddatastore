@@ -48,9 +48,9 @@ export default class Grid extends React.Component {
 
   renderRow = () => {
     let _num = Math.floor(this.props.imageDimentions.height / 20);
-    // let _num = 9
+    // let _num = 13
     let num_rows = Math.floor(this.props.imageDimentions.width / 12) - 1;
-    // let num_rows = 2;
+    // let num_rows = 40;
     let _list = [];
     let i = 0;
     for (i = 0; i < _num-1; i++) {
