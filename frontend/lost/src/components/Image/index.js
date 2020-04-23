@@ -32,9 +32,9 @@ function InstructionModal(props) {
       <Modal.Body>
         <ol>
           <li>Select a label from radio button below</li>
-          <li>Click and hover over the points on image</li>
-          <li>Click Save when you are done with selecting points</li>
-          <li>Repeat or go to next or previous image</li>
+          <li>Click and hover over the points on image to annotate</li>
+          <li>Label can be chnaged</li>
+          <li>Click on next image to save annotation</li>
         </ol>
       </Modal.Body>
       <Modal.Footer>
@@ -296,6 +296,18 @@ export default class Image extends React.Component {
     }
   };
 
+
+  onClickFinishButton = async imageProp => {
+    await this.handleSubmit();
+    if (Object.keys(this.state.coordinates_data).length !== 0) {
+      this.postAnnotationAsync().then(data => {
+        this.setState({ redirect: true });
+      });
+    } else {
+      this.setState({ redirect: true });
+    }
+  };
+
   renderNextButton = () => {
     if (this.state.redirect) {
       return <Redirect to="/dashboard" />;
@@ -306,7 +318,7 @@ export default class Image extends React.Component {
           type="button"
           variant="danger"
           onClick={() => {
-            this.setState({ redirect: true });
+            this.onClickFinishButton()
           }}
         >
           Finish
@@ -447,12 +459,8 @@ export default class Image extends React.Component {
   };
 
   render() {
-    console.log("@@@@@@@@@@@", this.state.xOffset, this.state.yOffset);
-    if(this.myRef.current){
-      console.log(this.myRef.current.getBoundingClientRect(), "&&&&&&&&&&&&&&&&&&&&&&")
-    }
     return (
-      <div style={{ backgroundColor: "grey" }}>
+      <div style={{ backgroundColor: "grey", overflow:'auto' }}>
         <div style={{ textAlign: "center", color: "white", marginBottom: 30 }}>
           {this.props.annos.image.url}
         </div>
@@ -562,9 +570,9 @@ export default class Image extends React.Component {
             }}
             style={{
               position: "absolute",
-              top: 7.5,
+              top: 11,
               marginTop: this.state.yOffset,
-              left: this.state.xOffset + 6,
+              left: this.state.xOffset + 11,
               width: 1120
             }}
           >
