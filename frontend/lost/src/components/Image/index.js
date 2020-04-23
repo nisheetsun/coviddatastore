@@ -16,11 +16,7 @@ let label_id_to_label = {};
 let hovered_points = [[], []];
 let hovered_coordinates = [[], []];
 
-// {"imgId":3,"imgLabelIds":[],"imgLabelChanged":false,"annotations":{"bBoxes":[],"lines":[],"points":[{"type":"point","data":{"x":0.3122846765714825,"y":0.4170911048166566},"mode":"view","status":"new","labelIds":[35],"selectedNode":0},{"type":"point","data":{"x":0.6858377243959223,"y":0.3039049115771725},"mode":"view","status":"new","labelIds":[35],"selectedNode":0},{"type":"point","data":{"x":0.5839596204438023,"y":0.5727221205209473},"mode":"view","status":"new","labelIds":[36],"selectedNode":0}],"polygons":[]},"isJunk":null}
-// http://localhost/api/sia/update
-// {"imgId":13,"imgLabelIds":[],"imgLabelChanged":false,"annotations":{"bBoxes":[],"lines":[],"points":[],"polygons":[{"type":"polygon","data":[{"x":0.25513675614361775,"y":0.31026252983293556},{"x":0.4264470612919301,"y":0.4128878281622912},{"x":0.1974087964541426,"y":0.711217183770883},{"x":0.1974087964541426,"y":0.711217183770883}],"mode":"editLabel","status":"new","labelIds":[35],"selectedNode":3}]},"isJunk":null}
-
-function MyVerticallyCenteredModal(props) {
+function InstructionModal(props) {
   return (
     <Modal
       {...props}
@@ -207,30 +203,6 @@ export default class Image extends React.Component {
     // });
 
     return [_rows_columns_data, _coordinates_data];
-
-    // let _final_data = this.state.final_data;
-    // for (let i of hovered_coordinates[0]) {
-    //   _final_data.push({
-    //     "x": i[0], "y": i[1]
-
-    //     // type: "polygon",
-    //     // data: { x: i[0], y: i[1] },
-    //     // mode: "editLabel",
-    //     // status: "new",
-    //     // labelIds: [this.state.value.id],
-    //     // selectedNode: 0
-    //   });
-    // }
-    // for (let i of hovered_coordinates[1]) {
-    //   _final_data.push({
-    //     type: "polygon",
-    //     data: { x: i[0], y: i[1] },
-    //     mode: "editLabel",
-    //     status: "new",
-    //     labelIds: [this.state.value.id],
-    //     selectedNode: 0
-    //   });
-    // }
   };
 
   changePointsLabels = () => {
@@ -435,12 +407,88 @@ export default class Image extends React.Component {
     });
   };
 
+  renderLabels = () => {
+    return (
+      <React.Fragment>
+        {this.props.labels.map((value, index) => {
+          if (value.label in colors) {
+          } else {
+            colors[value.id] = this.props.colors[index];
+          }
+          if (value.id in label_id_to_label) {
+          } else {
+            label_id_to_label[value.id] = value.label;
+          }
+
+          return (
+            <div className="input-screen">
+              <input
+                type="radio"
+                checked={value.label === this.state.value.label}
+                name="colors"
+                onChange={e => {
+                  this.onChangeOfLabel(value, index);
+                }}
+              />
+              <div style={{ marginLeft: 10 }}>{value.label}</div>
+              <div
+                style={{
+                  marginLeft: 10,
+                  backgroundColor: this.props.colors[index],
+                  height: 10,
+                  width: 10
+                }}
+              />
+            </div>
+          );
+        })}
+      </React.Fragment>
+    );
+  };
+
   render() {
+    console.log("@@@@@@@@@@@", this.state.xOffset, this.state.yOffset);
+    if(this.myRef.current){
+      console.log(this.myRef.current.getBoundingClientRect(), "&&&&&&&&&&&&&&&&&&&&&&")
+    }
     return (
       <div style={{ backgroundColor: "grey" }}>
         <div style={{ textAlign: "center", color: "white", marginBottom: 30 }}>
           {this.props.annos.image.url}
         </div>
+        {/* {this.state.imageLoaded ? ( */}
+          <div
+            style={{ marginTop: 10 }}
+            className="center-screen"
+          >
+            {this.renderPrevButton()}
+
+            <div>
+              <div style={{ marginBottom: 5, textDecoration: "underline" }}>
+                Select a label
+              </div>
+              {/* <div style={{height: 120, overflow: 'auto', width:200, borderStyle:'solid', borderColor:'green'}}> */}
+                {this.props.labels.length ? this.renderLabels() : null}
+              {/* </div> */}
+
+              <div style={{ marginTop: 20, marginBottom: 20 }}>
+                <Button
+                  variant="warning"
+                  type="button"
+                  onClick={() => this.setModalShow(true)}
+                >
+                  Instructions
+                </Button>
+
+                <InstructionModal
+                  show={this.state.modalShow}
+                  onHide={() => this.setModalShow(false)}
+                />
+              </div>
+            </div>
+            {this.renderNextButton()}
+          </div>
+        {/* ) : null} */}
         <div
           style={{
             width: 1100,
@@ -460,43 +508,6 @@ export default class Image extends React.Component {
             className="image"
             draggable="false"
           />
-          {/* {this.state.imageLoaded ? (
-            <div
-              onMouseDown={e => {
-                this.setStateWrapper({ is_mousedown: true });
-              }}
-              onMouseUp={e => {
-                this.setStateWrapper({ is_mousedown: false });
-              }}
-              className="overlay"
-            >
-              {
-                <React.Fragment>
-                  <Grid
-                    random_offset={this.random_offset}
-                    colors={this.state.colors}
-                    static_data={this.state.static_data}
-                    xMargin={this.myRef.current.getBoundingClientRect()["x"]}
-                    yMargin={this.myRef.current?this.myRef.current.getBoundingClientRect()["y"]:null}
-                    color={this.state.color}
-                    label={this.state.value.label}
-                    label_id={this.state.value.id}
-                    image_url={this.props.imageUrl}
-                    key={"0grid"}
-                    grid_number={0}
-                    points_to_label_mapping={
-                      this.state.points_to_label_mapping[0]
-                    }
-                    removeHoveredPoints={this.removeHoveredPoints}
-                    rows_columns_data={this.state.rows_columns_data}
-                    addToHoveredPoints={this.addToHoveredPoints}
-                    imageDimentions={this.state.imageDimentions}
-                    is_mousedown={this.state.is_mousedown}
-                  />
-                </React.Fragment>
-              }
-            </div>
-          ) : null} */}
 
           <div
             onMouseDown={e => {
@@ -542,44 +553,6 @@ export default class Image extends React.Component {
             />
           </div>
 
-          {/* {this.state.imageLoaded ? (
-            <div
-              onMouseDown={e => {
-                this.setStateWrapper({ is_mousedown: true });
-              }}
-              onMouseUp={e => {
-                this.setStateWrapper({ is_mousedown: false });
-              }}
-              className="overlay-new"
-            >
-              {
-                <React.Fragment>
-                  <Grid
-                    random_offset={this.random_offset}
-                    colors={this.state.colors}
-                    static_data={this.state.static_data}
-                    xMargin={this.myRef.current.getBoundingClientRect()["x"]}
-                    yMargin={this.myRef.current?this.myRef.current.getBoundingClientRect()["y"]:null}
-                    color={this.state.color}
-                    label={this.state.value.label}
-                    label_id={this.state.value.id}
-                    imageUrl={this.props.imageUrl}
-                    key={"1grid"}
-                    grid_number={1}
-                    points_to_label_mapping={
-                      this.state.points_to_label_mapping[1]
-                    }
-                    removeHoveredPoints={this.removeHoveredPoints}
-                    rows_columns_data={this.state.rows_columns_data}
-                    addToHoveredPoints={this.addToHoveredPoints}
-                    imageDimentions={this.state.imageDimentions}
-                    is_mousedown={this.state.is_mousedown}
-                  />
-                </React.Fragment>
-              }
-            </div>
-          ) : null} */}
-
           <div
             onMouseDown={e => {
               this.setStateWrapper({ is_mousedown: true });
@@ -624,7 +597,8 @@ export default class Image extends React.Component {
             />
           </div>
         </div>
-        {this.state.imageLoaded ? (
+        <div style={{marginBottom: 30, height: 30}}></div>
+        {/* {this.state.imageLoaded ? (
           <div
             style={{ marginTop: 10, marginBottom: 20 }}
             className="center-screen"
@@ -635,40 +609,7 @@ export default class Image extends React.Component {
               <div style={{ marginBottom: 5, textDecoration: "underline" }}>
                 Select a label
               </div>
-              {this.props.labels.length
-                ? this.props.labels.map((value, index) => {
-                    if (value.label in colors) {
-                    } else {
-                      colors[value.id] = this.props.colors[index];
-                    }
-                    if (value.id in label_id_to_label) {
-                    } else {
-                      label_id_to_label[value.id] = value.label;
-                    }
-
-                    return (
-                      <div className="input-screen">
-                        <input
-                          type="radio"
-                          checked={value.label === this.state.value.label}
-                          name="colors"
-                          onChange={e => {
-                            this.onChangeOfLabel(value, index);
-                          }}
-                        />
-                        <div style={{ marginLeft: 10 }}>{value.label}</div>
-                        <div
-                          style={{
-                            marginLeft: 10,
-                            backgroundColor: this.props.colors[index],
-                            height: 10,
-                            width: 10
-                          }}
-                        />
-                      </div>
-                    );
-                  })
-                : null}
+              {this.props.labels.length ? this.renderLabels() : null}
 
               <div style={{ marginTop: 20, marginBottom: 20 }}>
                 <Button
@@ -679,7 +620,7 @@ export default class Image extends React.Component {
                   Instructions
                 </Button>
 
-                <MyVerticallyCenteredModal
+                <InstructionModal
                   show={this.state.modalShow}
                   onHide={() => this.setModalShow(false)}
                 />
@@ -687,7 +628,7 @@ export default class Image extends React.Component {
             </div>
             {this.renderNextButton()}
           </div>
-        ) : null}
+        ) : null} */}
       </div>
     );
   }

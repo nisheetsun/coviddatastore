@@ -54,6 +54,7 @@ export default class Point extends React.Component {
 
   onHover = e => {
     const yMargin = this.props.yMargin+window.pageYOffset
+    console.log("!!!!!!!!!!!!!!", e.pageY, yMargin, this.props.yMargin, window.pageYOffset, e.pageY-yMargin)
     if (
       this.props.is_mousedown &&
       this.state.label === null &&
