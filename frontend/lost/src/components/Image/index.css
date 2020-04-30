@@ -5,7 +5,7 @@
 
 .image {
   display: block;
-  width: 100%;
+  /* width: 100%; */
   height: auto;
   /* user-drag: none;  */
   -moz-user-select: none;

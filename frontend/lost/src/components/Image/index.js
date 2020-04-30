@@ -14,8 +14,12 @@ let colors = {};
 let label_id_to_label = {};
 let hovered_points = [[], []];
 let hovered_coordinates = [[], []];
+// let points_to_delete = 
 let xOffsetAddition = 11;
 let yOffsetAddition = 15;
+
+let controlPressed = false;
+let zPrressed = false;
 
 function InstructionModal(props) {
   return (
@@ -60,9 +64,13 @@ export default class Image extends React.Component {
       posting: false,
       xOffset: 0,
       yOffset: 0,
+      is_undo_disabled: false,
+      canAnnotate: true,
 
-      history_row_columns: [[], []],
-      history_coordinates: [[], []],
+      // history_row_columns: [[], []],
+      // history_coordinates: [[], []],
+      history_row_columns: [],
+      history_coordinates: [],
       is_mousedown: false,
 
       rows_columns_data: {},
@@ -80,9 +88,36 @@ export default class Image extends React.Component {
     };
   }
 
+  keyDown = e => {
+    // console.log(e.keyCode, 'keydown')
+    if (controlPressed == false && e.keyCode == 17) {
+      controlPressed = true;
+    }
+    if (controlPressed == true && zPrressed == false && e.keyCode == 90) {
+      console.log("YEY");
+      this.undo();
+    }
+
+    if (zPrressed == false && e.keyCode == 90) {
+      zPrressed = true;
+    }
+  };
+
+  keyUp = e => {
+    // console.log(e.keyCode, 'keyup')
+    if (zPrressed == true && e.keyCode == 90) {
+      zPrressed = false;
+    }
+    if (controlPressed == true && e.keyCode == 17) {
+      controlPressed = false;
+    }
+  };
+
   componentDidMount() {
+    document.addEventListener("keydown", this.keyDown, false);
+    document.addEventListener("keyup", this.keyUp, false);
     this.random_offset = {
-      // removing addition of 1 will be breaking change 
+      // removing addition of 1 will be breaking change
       x: (this.props.imageId % 9) + 1,
       y: (this.props.imageId % 6) + 5
     };
@@ -92,13 +127,21 @@ export default class Image extends React.Component {
     });
   }
 
+  componentWillUnmount() {
+    document.removeEventListener("keydown", this.keyDown, false);
+    document.removeEventListener("keyup", this.keyUp, false);
+  }
+
   reset = func => {
     this.setState(
       {
-        history_row_columns: [[], []],
-        history_coordinates: [[], []],
+        // history_row_columns: [[], []],
+        // history_coordinates: [[], []],
+        history_row_columns: [],
+        history_coordinates: [],
         rows_columns_data: {},
         coordinates_data: {},
+        is_undo_disabled: false,
         redirect: false,
         static_data: {
           imageUrl: null,
@@ -117,6 +160,7 @@ export default class Image extends React.Component {
   };
 
   onImgLoad = ({ target: img }) => {
+    // alert(img.offsetHeight+'   '+img.offsetWidth)
     this.setStateWrapper({
       imageDimentions: { height: img.offsetHeight, width: img.offsetWidth },
       imageLoaded: true
@@ -159,21 +203,32 @@ export default class Image extends React.Component {
     this.setState(key_value_dict);
   };
 
-  changeHistory = () => {
+  addToHistory = () => {
     let _history_row_columns = this.state.history_row_columns;
     let _label = this.state.value.id;
-    let temp1 = { [_label]: hovered_points[0] };
-    let temp2 = { [_label]: hovered_points[1] };
-    _history_row_columns[0].push(temp1);
-    _history_row_columns[1].push(temp2);
-    this.setState({ history_row_columns: _history_row_columns });
+    // console.log("&&&&&&&&&&", hovered_points)
+    // let temp1 = { [_label]: hovered_points[0] };
+    // let temp2 = { [_label]: hovered_points[1] };
+    // _history_row_columns[0].push(temp1);
+    // _history_row_columns[1].push(temp2);
+    _history_row_columns.push({
+      label: _label,
+      points: [hovered_points[0], hovered_points[1]],
+      [_label]: [hovered_points[0], hovered_points[1]]
+    });
+    // this.setState({ history_row_columns: _history_row_columns });
 
     let _history_coordinates = this.state.history_coordinates;
-    temp1 = { [_label]: hovered_coordinates[0] };
-    temp2 = { [_label]: hovered_coordinates[1] };
-    _history_coordinates[0].push(temp1);
-    _history_coordinates[1].push(temp2);
-    return _history_coordinates;
+    // temp1 = { [_label]: hovered_coordinates[0] };
+    // temp2 = { [_label]: hovered_coordinates[1] };
+    // _history_coordinates[0].push(temp1);
+    // _history_coordinates[1].push(temp2);
+    _history_coordinates.push({
+      label: _label,
+      points: [hovered_coordinates[0], hovered_coordinates[1]],
+      [_label]: [hovered_coordinates[0], hovered_coordinates[1]]
+    });
+    return [_history_row_columns, _history_coordinates];
     // this.setState({ history_coordinates: _history_coordinates });
   };
 
@@ -181,17 +236,24 @@ export default class Image extends React.Component {
     let _label = this.state.value.id;
     let _rows_columns_data = this.state.rows_columns_data;
     let _coordinates_data = this.state.coordinates_data;
-    if (_label in _rows_columns_data) {
-      _rows_columns_data[_label].concat(hovered_points[0]);
-      _rows_columns_data[_label].concat(hovered_points[1]);
-      _coordinates_data[_label].concat(hovered_coordinates[0]);
-      _coordinates_data[_label].concat(hovered_coordinates[1]);
-    } else {
-      _rows_columns_data[_label] = [...hovered_points[0], ...hovered_points[1]];
-      _coordinates_data[_label] = [
-        ...hovered_coordinates[0],
-        ...hovered_coordinates[1]
-      ];
+    try {
+      if (_label in _rows_columns_data) {
+        _rows_columns_data[_label].concat(hovered_points[0]);
+        _rows_columns_data[_label].concat(hovered_points[1]);
+        _coordinates_data[_label].concat(hovered_coordinates[0]);
+        _coordinates_data[_label].concat(hovered_coordinates[1]);
+      } else {
+        _rows_columns_data[_label] = [
+          ...hovered_points[0],
+          ...hovered_points[1]
+        ];
+        _coordinates_data[_label] = [
+          ...hovered_coordinates[0],
+          ...hovered_coordinates[1]
+        ];
+      }
+    } catch (e) {
+      console.log(_coordinates_data, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!", _label);
     }
     return [_rows_columns_data, _coordinates_data];
   };
@@ -227,10 +289,17 @@ export default class Image extends React.Component {
     return _points_to_label_mapping;
   };
 
+  changeCanAnnotate = async value => {
+    return new Promise(resolve => {
+      this.setState({ canAnnotate: value }, resolve);
+    });
+  };
+
   // called when label is submitted
-  handleSubmit = () => {
+  handleSubmit = async () => {
     if (hovered_points[0].length || hovered_points[1].length) {
-      // let changeHistoryData = this.changeHistory();
+      await this.changeCanAnnotate(false);
+      let changeHistoryData = this.addToHistory();
       let addAnnotiationData = this.addAnnotiation();
       let changePointsLabelsData = this.changePointsLabels();
 
@@ -241,10 +310,12 @@ export default class Image extends React.Component {
       return new Promise(resolve => {
         this.setState(
           {
-            // history_coordinates: changeHistoryData,
+            history_row_columns: changeHistoryData[0],
+            history_coordinates: changeHistoryData[1],
             // rows_columns_data: addAnnotiationData[0],
             coordinates_data: addAnnotiationData[1],
-            points_to_label_mapping: changePointsLabelsData
+            points_to_label_mapping: changePointsLabelsData,
+            canAnnotate: true
           },
           resolve
         );
@@ -257,24 +328,64 @@ export default class Image extends React.Component {
     hovered_coordinates[grid_number].push([x, y]);
   };
 
-  removedFromHoveredPoints = (x, y, row, column, grid_number) => {
+  removePointFromLabel = (x, y, row, column, grid_number, label_id) => {
+    let _coordinates_data = this.state.coordinates_data
+    let _index = _coordinates_data[label_id].findIndex(
+      element =>
+        element[0] == x &&
+        element[1] == y
+    );
+    // console.log("*************", x, y, row, column, grid_number, label_id, this.state.coordinates_data, _index)
+    this.setState({coordinates_data:_coordinates_data}, this.addToHoveredPoints(x, y, row, column, grid_number))
+    if (_index >= 0) {
+      if (_coordinates_data[label_id].length == 1) {
+        delete _coordinates_data[label_id];
+      } else {
+        _coordinates_data[label_id].splice(_index, 1);
+      }
+    }else{
+
+    }
+    // addToHoveredPoints
+    // hovered_points[grid_number].push([row, column]);
+    // hovered_coordinates[grid_number].push([x, y]);
+  };
+
+  // removeFromHoveredPoints = (x, y, row, column, grid_number) => {
+  removeFromHoveredPoints = (
+    coordinates_list,
+    row_column_list,
+    grid_number
+  ) => {
     let _coordinates_data = this.state.coordinates_data;
     let _points_to_label_mapping = this.state.points_to_label_mapping;
-    for (let key in _coordinates_data) {
-      let _index = _coordinates_data[key].findIndex(
-        element => element[0] == x && element[1] == y
-      );
-      if (_index >= 0) {
-        _coordinates_data[key].splice(_index, 1);
+    for (let i = 0; i < coordinates_list.length; i++) {
+      for (let key in _coordinates_data) {
+        let _index = _coordinates_data[key].findIndex(
+          element =>
+            element[0] == coordinates_list[i][0] &&
+            element[1] == coordinates_list[i][1]
+        );
+        if (_index >= 0) {
+          if (_coordinates_data[key].length == 1) {
+            delete _coordinates_data[key];
+          } else {
+            _coordinates_data[key].splice(_index, 1);
+          }
+        }
+      }
+
+      if (
+        row_column_list[i][0] in _points_to_label_mapping[grid_number] &&
+        row_column_list[i][1] in
+          _points_to_label_mapping[grid_number][row_column_list[i][0]]
+      ) {
+        delete _points_to_label_mapping[grid_number][row_column_list[i][0]][
+          row_column_list[i][1]
+        ];
       }
     }
 
-    if (
-      row in _points_to_label_mapping[grid_number] &&
-      column in _points_to_label_mapping[grid_number][row]
-    ) {
-      delete _points_to_label_mapping[grid_number][row][column];
-    }
     this.setState({
       coordinates_data: _coordinates_data,
       points_to_label_mapping: _points_to_label_mapping
@@ -435,6 +546,43 @@ export default class Image extends React.Component {
     }
   };
 
+  undo = async () => {
+    await this.changeCanAnnotate(false);
+    if (this.state.history_coordinates.length > 0) {
+      let _history_coordinates = this.state.history_coordinates;
+      let _history_row_columns = this.state.history_row_columns;
+      let _last_element_coordinates =
+        _history_coordinates[_history_coordinates.length - 1];
+      let _last_element_row_column =
+        _history_row_columns[_history_row_columns.length - 1];
+      _history_coordinates.pop();
+      _history_row_columns.pop();
+      this.removeFromHoveredPoints(
+        _last_element_coordinates["points"][0],
+        _last_element_row_column["points"][0],
+        0
+      );
+      this.removeFromHoveredPoints(
+        _last_element_coordinates["points"][1],
+        _last_element_row_column["points"][1],
+        1
+      );
+      this.setState({
+        history_coordinates: _history_coordinates,
+        history_row_columns: _history_row_columns,
+        is_undo_disabled: false,
+        canAnnotate: true
+      });
+    } else {
+      if (this.state.is_undo_disabled == true) {
+        this.setState({
+          is_undo_disabled: false,
+          canAnnotate: true
+        });
+      }
+    }
+  };
+
   renderLabels = () => {
     return (
       <React.Fragment>
@@ -447,7 +595,7 @@ export default class Image extends React.Component {
               this.onChangeOfLabel({ label: "erase", id: -1 }, -1);
             }}
           />
-          <div style={{marginLeft: 20}}>{"Erase annotated points"}</div>
+          <div style={{ marginLeft: 20 }}>{"Erase annotated points"}</div>
         </div>
         {this.props.labels.map((value, index) => {
           if (value.label in colors) {
@@ -488,9 +636,17 @@ export default class Image extends React.Component {
   renderImage = () => {
     return (
       <div
+        onMouseDown={e => {
+          this.setStateWrapper({ is_mousedown: true });
+        }}
+        onMouseUp={e => {
+          this.setStateWrapper({ is_mousedown: false }, this.handleSubmit());
+        }}
         id="imageComponent"
         style={{
-          width: 1100,
+          width: this.state.imageDimentions.width
+            ? this.state.imageDimentions.width
+            : 0,
           margin: "auto",
           position: "relative"
         }}
@@ -506,18 +662,14 @@ export default class Image extends React.Component {
         />
 
         <div
-          onMouseDown={e => {
-            this.setStateWrapper({ is_mousedown: true });
-          }}
-          onMouseUp={e => {
-            this.setStateWrapper({ is_mousedown: false });
-          }}
           style={{
             position: "absolute",
             top: 0,
             marginTop: this.state.yOffset,
             left: this.state.xOffset,
-            width: 1120
+            width: this.state.imageDimentions.width
+              ? this.state.imageDimentions.width + 30
+              : 0
           }}
         >
           <Grid
@@ -546,28 +698,31 @@ export default class Image extends React.Component {
             key={"0grid"}
             grid_number={0}
             points_to_label_mapping={this.state.points_to_label_mapping[0]}
-            removeHoveredPoints={this.removeHoveredPoints}
             rows_columns_data={this.state.rows_columns_data}
             addToHoveredPoints={this.addToHoveredPoints}
-            removedFromHoveredPoints={this.removedFromHoveredPoints}
+            removeFromHoveredPoints={this.removeFromHoveredPoints}
             imageDimentions={this.state.imageDimentions}
             is_mousedown={this.state.is_mousedown}
+            removePointFromLabel={this.removePointFromLabel}
           />
         </div>
 
         <div
-          onMouseDown={e => {
-            this.setStateWrapper({ is_mousedown: true });
-          }}
-          onMouseUp={e => {
-            this.setStateWrapper({ is_mousedown: false });
-          }}
+          // onMouseDown={e => {
+          //   this.setStateWrapper({ is_mousedown: true });
+          // }}
+          // onMouseUp={e => {
+          //   this.setStateWrapper({ is_mousedown: false }, this.handleSubmit());
+          //   // await this.handleSubmit();
+          // }}
           style={{
             position: "absolute",
             top: yOffsetAddition,
             marginTop: this.state.yOffset,
             left: this.state.xOffset + xOffsetAddition,
-            width: 1120
+            width: this.state.imageDimentions.width
+              ? this.state.imageDimentions.width + 30
+              : 0
           }}
         >
           <Grid
@@ -596,12 +751,12 @@ export default class Image extends React.Component {
             key={"1grid"}
             grid_number={1}
             points_to_label_mapping={this.state.points_to_label_mapping[1]}
-            removeHoveredPoints={this.removeHoveredPoints}
             rows_columns_data={this.state.rows_columns_data}
             addToHoveredPoints={this.addToHoveredPoints}
-            removedFromHoveredPoints={this.removedFromHoveredPoints}
+            removeFromHoveredPoints={this.removeFromHoveredPoints}
             imageDimentions={this.state.imageDimentions}
             is_mousedown={this.state.is_mousedown}
+            removePointFromLabel={this.removePointFromLabel}
           />
         </div>
       </div>
@@ -643,9 +798,35 @@ export default class Image extends React.Component {
             <Button
               variant="danger"
               type="button"
-              onClick={() => this.reset(()=>{})}
+              onClick={() => this.reset(() => {})}
             >
-              Delete Unsaved Annotations
+              Delete All Unsaved Annotations
+            </Button>
+          </div>
+          <div
+            style={{
+              marginTop: 20,
+              marginBottom: 20,
+              display: "flex",
+              justifyContent: "space-around"
+            }}
+          >
+            <Button
+              variant="warning"
+              type="button"
+              disabled={this.state.is_undo_disabled}
+              onClick={() => {
+                this.setState({ is_undo_disabled: true }, this.undo);
+              }}
+            >
+              Undo
+            </Button>
+            <Button
+              variant="warning"
+              type="button"
+              onClick={() => this.reset(() => {})}
+            >
+              Redo
             </Button>
           </div>
         </div>
@@ -654,11 +835,29 @@ export default class Image extends React.Component {
   };
 
   render() {
+    console.log(
+      "!!!!!@@@@@!!!!!",
+      this.state.coordinates_data
+    );
     if (document.getElementById("imageComponent")) {
-      document.getElementById("imageComponent").style.cursor = "crosshair";
+      document.getElementById("imageComponent").style.cursor = this.state
+        .canAnnotate
+        ? "crosshair"
+        : "wait";
+    }
+    if (document.getElementById("container")) {
+      if (this.state.canAnnotate) {
+        document.getElementById("container").style.cursor = "auto";
+      } else {
+        document.getElementById("container").style.cursor = "wait";
+      }
     }
     return (
-      <div style={{ backgroundColor: "grey", overflow: "auto" }} id="container">
+      <div
+        id="imageParent"
+        style={{ backgroundColor: "grey", overflow: "auto" }}
+        id="container"
+      >
         <div style={{ textAlign: "center", color: "white", marginBottom: 30 }}>
           {this.props.annos.image.url}
         </div>
