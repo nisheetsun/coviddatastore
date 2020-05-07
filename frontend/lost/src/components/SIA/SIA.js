@@ -126,7 +126,6 @@ class SIA extends Component {
 
   requestImageFromBackend() {
     this.props.getSiaImage(this.props.annos.image.url).then(response => {
-      // console.log("%%%%%%%%%%%%", response)
       this.setState({
         image: {
           // ...this.state.image,
@@ -139,7 +138,6 @@ class SIA extends Component {
   }
 
   render() {
-    console.log("**********", this.state.image.data)
     return (
       <div>
         {this.state.image.data ? (

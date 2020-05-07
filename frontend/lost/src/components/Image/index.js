@@ -147,7 +147,7 @@ class Canvas extends React.Component {
       }
     }
 
-    if (_min > offset_limit) {
+    if (_min >= offset_limit) {
       return null;
     }
 
@@ -168,7 +168,6 @@ class Canvas extends React.Component {
           ) {
             this.temp_stack.push(_coordinate);
             if (value["color_id"] == -1) {
-              // console.log("*************", this.undo_stack, this.redo_stack, _coordinate)
               this.redo_stack = [];
               this.drawDots(
                 ctx,
@@ -180,7 +179,6 @@ class Canvas extends React.Component {
               delete this.points_label_map[_coordinate[0]][_coordinate[1]];
             } else {
               this.points_label_map[_coordinate[0]][_coordinate[1]] = value;
-              // console.log("*************", this.undo_stack, this.redo_stack, _coordinate)
               this.redo_stack = [];
               this.drawDots(
                 ctx,
@@ -196,7 +194,6 @@ class Canvas extends React.Component {
           if (value["color_id"] == -1) {
           } else {
             this.points_label_map[_coordinate[0]][_coordinate[1]] = value;
-            // console.log("*************", this.undo_stack, this.redo_stack, _coordinate)
             this.redo_stack = [];
             this.drawDots(
               ctx,
@@ -214,7 +211,6 @@ class Canvas extends React.Component {
           this.points_label_map[_coordinate[0]] = {
             [_coordinate[1]]: value
           };
-          // console.log("*************", this.undo_stack, this.redo_stack, _coordinate)
           this.redo_stack = [];
           this.drawDots(
             ctx,
@@ -268,13 +264,18 @@ class Canvas extends React.Component {
       y,
       offset_limit
     );
+
     if (value["id"] == -1 || value["color_id"] == -1) {
       // erased_points
-      if (_coordinate) {
+      if (
+        _coordinate &&
+        _coordinate[0] in this.points_label_map &&
+        _coordinate[1] in this.points_label_map[_coordinate[0]]
+      ) {
         if (_coordinate[0] in this.erased_points) {
-          this.erased_points[_coordinate[0]][_coordinate[1]] = true;
+          this.erased_points[_coordinate[0]][_coordinate[1]] = this.points_label_map[_coordinate[0]][_coordinate[1]];
         } else {
-          this.erased_points[_coordinate[0]][_coordinate[1]] = true;
+          this.erased_points[_coordinate[0]] = { [_coordinate[1]]: this.points_label_map[_coordinate[0]][_coordinate[1]] };
         }
       }
     } else {
@@ -287,14 +288,7 @@ class Canvas extends React.Component {
         }
       }
     }
-    console.log(
-      "@@@@@@@@@@@@@@@@@@@@",
-      _coordinate,
-      x,
-      y,
-      value,
-      coordinates_list
-    );
+
     this.paintCoordinate(ctx, _coordinate, value);
   };
 
@@ -373,7 +367,6 @@ class Canvas extends React.Component {
         }
       }
     }
-    // console.log("*************", this.undo_stack, this.redo_stack)
   };
 
   redo = () => {
@@ -433,6 +426,39 @@ class Canvas extends React.Component {
         _data.push(_label_data[label_id]);
       }
     }
+
+    // delete data
+    _label_data = {};
+    // let _erase_data = [];
+    for(let x in this.erased_points){
+      for(let y in this.erased_points[x]){
+        if(x in this.points_label_map_original && y in this.points_label_map_original[x]){
+          is_data_present = true;
+          if( this.erased_points[x][y]['id'] in _label_data){
+            _label_data[this.erased_points[x][y]['id']]['data'].push({x:x, y:y})
+          }else{
+            _label_data[this.erased_points[x][y]['id']] = {
+              labelIds: [this.erased_points[x][y]['id'].toString()],
+              mode: "view",
+              status: "deleted",
+              type: "polygon",
+              data: [{x:x, y:y}]
+            };
+          }
+        }
+      }
+    }
+
+    console.log(_label_data)
+
+
+    for (let _label_id in _label_data) {
+      _data.push(_label_data[_label_id])
+    }
+
+
+
+    // delete data
 
     let payload = {
       imgId: this.props.imageId,
@@ -503,7 +529,6 @@ class Canvas extends React.Component {
   finish = () => {
     this.setState({ posting: true }, () => {
       let payload = this.getPayload();
-      // console.log("!@!@!@!@!@!@", payload);
 
       saveAnnotationApi(payload).then(response => {
         this.setState({ posting: false }, () => {
@@ -567,14 +592,21 @@ class Canvas extends React.Component {
   renderLeftSideControls = () => {
     return (
       <div>
-        <div
+        {/* <div
           onClick={() => {
-            console.log("!!!!!!!!", this.points_label_map);
+            console.log(
+              "*****",
+              this.points_label_map,
+              this.points_label_map_original,
+              this.erased_points,
+              this.state.marginLeft,
+              this.state.marginTop
+            );
           }}
         >
           {" "}
           console
-        </div>
+        </div> */}
         <h5 style={{ textAlign: "center" }}>
           <u>Select a label</u>
         </h5>
@@ -622,34 +654,6 @@ class Canvas extends React.Component {
     );
   };
 
-  componentDidUpdate(prevProps, prevState, snapshot) {
-    // if(this.state.deletelater_index!=prevState.deletelater_index){
-    //   this.points_label_map={}
-    //   this.undo_stack = []
-    //   this.redo_stack = []
-    //   const canvas = this.refs.canvas;
-    //   const ctx = canvas.getContext("2d");
-    //   var _img_ = new Image();
-    //   _img_.onload = () => {
-    //     let _marinLeft = (this.props.imageId % 10) + minimum_left_margin;
-    //     let _marinTop = (this.props.imageId % 10) + minimum_top_margin;
-    //     this.setState(
-    //       {
-    //         width: _img_.width,
-    //         height: _img_.height,
-    //         marginLeft: _marinLeft,
-    //         marginTop: _marinTop,
-    //         imageLoading: false
-    //       },
-    //       () => {
-    //         ctx.drawImage(_img_, 0, 0);
-    //         this.drawDefaultDots(ctx);
-    //       }
-    //     );
-    //   };
-    //   _img_.src = this.deletelater_image[this.state.deletelater_index]
-    // }
-  }
 
   getColorIndex = (data, labels, all_colors) => {
     for (let label_index = 0; label_index < labels.length; label_index++) {
@@ -664,33 +668,22 @@ class Canvas extends React.Component {
     if (this.props.annos.annotations.polygons.length) {
       for (let i of this.props.annos.annotations.polygons) {
         let color_index = this.getColorIndex(i, this.props.labels, colors);
-        console.log("%%%%%%", color_index);
         for (let j of i.data) {
           if (j.x in data) {
-            // this.labelDots(686.53125, 302, {'id':i['labelIds'][0], 'color_id': color_index})
-            this.labelDots(
-              j.x,
-              j.y,
-              { id: i["labelIds"][0], color_id: color_index },
-              0.4
-            );
           } else {
             data[j.x] = {};
           }
+          this.labelDots(
+            j.x,
+            j.y,
+            { id: i["labelIds"][0], color_id: color_index },
+            0.1
+          );
           data[j.x][j.y] = i.labelIds[0];
         }
       }
     }
     this.points_label_map_original = data;
-    console.log(
-      this.props.imageUrl,
-      "!!!!!!!!!!!!!!!!!!!!",
-      this.props.annos.annotations.polygons,
-      data,
-      this.props.labels,
-      this.points_label_map_original,
-      this.points_label_map
-    );
   };
 
   componentDidMount() {
@@ -754,7 +747,6 @@ class Canvas extends React.Component {
           });
           this.temp_stack = [];
         }
-        // console.log("@@@@@@@@@@@@@@points_label_map", this.points_label_map);
       },
       false
     );
@@ -786,8 +778,6 @@ class Canvas extends React.Component {
         <div style={{ display: "flex", flexDirection: "row" }}>
           <div
             style={{
-              borderStyle: "solid",
-              borderColor: "green",
               marginLeft: 10
             }}
           >
@@ -802,8 +792,6 @@ class Canvas extends React.Component {
           />
           <div
             style={{
-              borderStyle: "solid",
-              borderColor: "green",
               marginLeft: 10,
               marginRight: 20
             }}
