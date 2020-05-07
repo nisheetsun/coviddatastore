@@ -73,3 +73,13 @@
   /* text-align: center; */
   /* justify-content: space-between; */
 }
+
+.left-control{
+  margin-right: 20px;
+  margin-left: 20px;
+  border-style: solid;
+  border-color: red;
+  flex-basis: 200px;
+  flex-grow: 0;
+  flex-shrink: 0;
+}

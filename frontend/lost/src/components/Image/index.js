@@ -1,485 +1,440 @@
 import React from "react";
-import axios from "axios";
-import Button from "react-bootstrap/Button";
-import Modal from "react-bootstrap/Modal";
-import Spinner from "react-bootstrap/Spinner";
-import { Redirect } from "react-router-dom";
-
-import { API_URL } from "../../settings";
-
 import "./index.css";
-import Grid from "../Grid";
+import {
+  distance_between_two_vertical_points as xDiff,
+  minimum_left_margin,
+  minimum_top_margin,
+  default_label,
+  default_color,
+  colors
+} from "../../utils/variables";
+import "./index.css";
+import Button from "react-bootstrap/Button";
+import { Redirect } from "react-router-dom";
+import { saveAnnotationApi } from "../../api/image";
 
-let colors = {};
-let label_id_to_label = {};
-let hovered_points = [[], []];
-let hovered_coordinates = [[], []];
-// let points_to_delete = 
-let xOffsetAddition = 11;
-let yOffsetAddition = 15;
+var url = require("url");
+var http = require("http");
 
-let controlPressed = false;
-let zPrressed = false;
+var _yoffset = Math.sqrt(2 * xDiff * (2 * xDiff) - xDiff * xDiff);
 
-function InstructionModal(props) {
-  return (
-    <Modal
-      {...props}
-      size="lg"
-      aria-labelledby="contained-modal-title-vcenter"
-      centered
-    >
-      <Modal.Header closeButton>
-        <Modal.Title id="contained-modal-title-vcenter">
-          Instructions
-        </Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        <ol>
-          <li>Select a label from radio button below</li>
-          <li>Click and hover over the points on image to annotate</li>
-          <li>Label can be changed as desired</li>
-          <li>
-            Click on next image or previous image button to save annotation
-          </li>
-        </ol>
-        - Arrow keys can be used to navigate over image when zoomed in.
-      </Modal.Body>
-      <Modal.Footer>
-        <Button onClick={props.onHide}>Close</Button>
-      </Modal.Footer>
-    </Modal>
-  );
-}
+var sizeOffset = 0;
 
-export default class Image extends React.Component {
+class Canvas extends React.Component {
   constructor(props) {
     super(props);
-    this.myRef = React.createRef();
+    this.isMouseDown = false;
+    this.undo_stack = [];
+    this.redo_stack = [];
+    this.temp_stack = [];
+    this.deletelater_image = [
+      "https://www.telegraph.co.uk/content/dam/news/2017/11/11/Lam1_trans%2B%2BnAdySV0BR-4fDN_-_p756cVfcy8zLGPV4EhRkjQy7tg.jpg",
+      "https://i.ytimg.com/vi/k8EURBL53_k/maxresdefault.jpg",
+      "https://media1.s-nbcnews.com/j/newscms/2014_22/469446/boeing-b52-conect1_0a6eb1293b9fa36dbab1b9cac9c7d16b.fit-760w.jpg"
+    ];
+    this.points_label_map = {};
+    this.points_label_map_original = {};
+    this.labels_visited = {};
+    this.erased_points = {};
     this.state = {
-      imageLoaded: false,
-      imageDimentions: { width: null, height: null },
-      boxDimention: { width: null, height: null },
-      modalShow: false,
+      width: null,
+      height: null,
+      marginLeft: null,
+      marginTop: null,
+      // imageLoading: true,
       posting: false,
-      xOffset: 0,
-      yOffset: 0,
-      is_undo_disabled: false,
-      canAnnotate: true,
-
-      // history_row_columns: [[], []],
-      // history_coordinates: [[], []],
-      history_row_columns: [],
-      history_coordinates: [],
-      is_mousedown: false,
-
-      rows_columns_data: {},
-      coordinates_data: {},
-      static_data: {
-        imageUrl: null,
-        data: {}
-      },
-      colors: {},
-      // final_data: [],
-
-      points_to_label_mapping: [{}, {}],
-      value: { label: null, id: null },
-      color: null
+      value: null,
+      deletelater_index: 0,
+      redirect: false
     };
   }
 
-  keyDown = e => {
-    // console.log(e.keyCode, 'keydown')
-    if (controlPressed == false && e.keyCode == 17) {
-      controlPressed = true;
-    }
-    if (controlPressed == true && zPrressed == false && e.keyCode == 90) {
-      console.log("YEY");
-      this.undo();
-    }
-
-    if (zPrressed == false && e.keyCode == 90) {
-      zPrressed = true;
-    }
-  };
-
-  keyUp = e => {
-    // console.log(e.keyCode, 'keyup')
-    if (zPrressed == true && e.keyCode == 90) {
-      zPrressed = false;
-    }
-    if (controlPressed == true && e.keyCode == 17) {
-      controlPressed = false;
-    }
-  };
-
-  componentDidMount() {
-    document.addEventListener("keydown", this.keyDown, false);
-    document.addEventListener("keyup", this.keyUp, false);
-    this.random_offset = {
-      // removing addition of 1 will be breaking change
-      x: (this.props.imageId % 9) + 1,
-      y: (this.props.imageId % 6) + 5
-    };
-    this.setState({
-      xOffset: this.random_offset.x,
-      yOffset: this.random_offset.y * -1
-    });
-  }
-
-  componentWillUnmount() {
-    document.removeEventListener("keydown", this.keyDown, false);
-    document.removeEventListener("keyup", this.keyUp, false);
-  }
-
-  reset = func => {
-    this.setState(
-      {
-        // history_row_columns: [[], []],
-        // history_coordinates: [[], []],
-        history_row_columns: [],
-        history_coordinates: [],
-        rows_columns_data: {},
-        coordinates_data: {},
-        is_undo_disabled: false,
-        redirect: false,
-        static_data: {
-          imageUrl: null,
-          data: {}
-        },
-        // final_data: [],
-        points_to_label_mapping: [{}, {}],
-        imageLoaded: false,
-        value: { label: null, id: null },
-        color: null
-      },
-      () => {
-        func();
-      }
-    );
-  };
-
-  onImgLoad = ({ target: img }) => {
-    // alert(img.offsetHeight+'   '+img.offsetWidth)
-    this.setStateWrapper({
-      imageDimentions: { height: img.offsetHeight, width: img.offsetWidth },
-      imageLoaded: true
-    });
-  };
-
-  componentDidUpdate = (prevProps, prevState) => {
-    if (this.state.static_data.imageUrl != this.props.imageUrl) {
-      let data = {};
-      if (this.props.annos.annotations.polygons.length) {
-        for (let i of this.props.annos.annotations.polygons) {
-          for (let j of i.data) {
-            if (j.x in data) {
-            } else {
-              data[j.x] = {};
-            }
-            data[j.x][j.y] = i.labelIds[0];
-          }
-        }
-      }
-      let _colors = {};
-      if (Object.keys(this.state.colors).length == 0) {
-        if (Object.keys(colors).length == 0) {
-        } else {
-          _colors = colors;
-        }
-      }
-
-      this.setState({
-        static_data: {
-          imageUrl: this.props.imageUrl,
-          data: data
-        },
-        colors: _colors
-      });
-    }
-  };
-
-  setStateWrapper = key_value_dict => {
-    this.setState(key_value_dict);
-  };
-
-  addToHistory = () => {
-    let _history_row_columns = this.state.history_row_columns;
-    let _label = this.state.value.id;
-    // console.log("&&&&&&&&&&", hovered_points)
-    // let temp1 = { [_label]: hovered_points[0] };
-    // let temp2 = { [_label]: hovered_points[1] };
-    // _history_row_columns[0].push(temp1);
-    // _history_row_columns[1].push(temp2);
-    _history_row_columns.push({
-      label: _label,
-      points: [hovered_points[0], hovered_points[1]],
-      [_label]: [hovered_points[0], hovered_points[1]]
-    });
-    // this.setState({ history_row_columns: _history_row_columns });
-
-    let _history_coordinates = this.state.history_coordinates;
-    // temp1 = { [_label]: hovered_coordinates[0] };
-    // temp2 = { [_label]: hovered_coordinates[1] };
-    // _history_coordinates[0].push(temp1);
-    // _history_coordinates[1].push(temp2);
-    _history_coordinates.push({
-      label: _label,
-      points: [hovered_coordinates[0], hovered_coordinates[1]],
-      [_label]: [hovered_coordinates[0], hovered_coordinates[1]]
-    });
-    return [_history_row_columns, _history_coordinates];
-    // this.setState({ history_coordinates: _history_coordinates });
-  };
-
-  addAnnotiation = () => {
-    let _label = this.state.value.id;
-    let _rows_columns_data = this.state.rows_columns_data;
-    let _coordinates_data = this.state.coordinates_data;
-    try {
-      if (_label in _rows_columns_data) {
-        _rows_columns_data[_label].concat(hovered_points[0]);
-        _rows_columns_data[_label].concat(hovered_points[1]);
-        _coordinates_data[_label].concat(hovered_coordinates[0]);
-        _coordinates_data[_label].concat(hovered_coordinates[1]);
+  getYCoordinated = (x, y) => {
+    let yLeft = null;
+    let yRight = null;
+    let yLeftTop = null;
+    let yLeftDown = null;
+    let yRightTop = null;
+    let yRightDown = null;
+    if (Math.trunc(x) % 2 == 0) {
+      if (y > this.state.marginTop + _yoffset) {
+        yLeft = (y - this.state.marginTop) / (_yoffset * 2) + 1;
+        yLeftTop =
+          this.state.marginTop + (Math.floor(yLeft) - 1) * (_yoffset * 2);
+        yLeftDown =
+          this.state.marginTop + (Math.ceil(yLeft) - 1) * (_yoffset * 2);
+        yRight = (y - (this.state.marginTop + _yoffset)) / (_yoffset * 2) + 1;
+        yRightTop =
+          this.state.marginTop +
+          _yoffset +
+          (Math.floor(yRight) - 1) * (_yoffset * 2);
+        yRightDown =
+          this.state.marginTop +
+          _yoffset +
+          (Math.ceil(yRight) - 1) * (_yoffset * 2);
       } else {
-        _rows_columns_data[_label] = [
-          ...hovered_points[0],
-          ...hovered_points[1]
-        ];
-        _coordinates_data[_label] = [
-          ...hovered_coordinates[0],
-          ...hovered_coordinates[1]
-        ];
-      }
-    } catch (e) {
-      console.log(_coordinates_data, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!", _label);
-    }
-    return [_rows_columns_data, _coordinates_data];
-  };
+        if (y < this.state.marginTop) {
+          yLeftTop = -1;
+          yLeftDown = this.state.marginTop;
 
-  changePointsLabels = () => {
-    let _label = this.state.value.id;
-    let _points_to_label_mapping = this.state.points_to_label_mapping;
-    let ii = 0;
-    while (ii < 2) {
-      for (let i = 0; i < hovered_points[ii].length; i++) {
-        if (hovered_points[ii][i][0] in _points_to_label_mapping[ii]) {
-          if (
-            hovered_points[ii][i][1] in
-            _points_to_label_mapping[ii][hovered_points[ii][i][0]]
-          ) {
-          } else {
-            _points_to_label_mapping[ii][hovered_points[ii][i][0]][
-              hovered_points[ii][i][1]
-            ] = { label_id: _label, colors: colors[_label] };
-          }
+          yRightTop = -1;
+          yRightDown = this.state.marginTop + _yoffset;
         } else {
-          _points_to_label_mapping[ii][hovered_points[ii][i][0]] = {
-            [hovered_points[ii][i][1]]: {
-              label_id: _label,
-              colors: colors[_label]
-            }
-          };
+          yLeftTop = this.state.marginTop;
+          yLeftDown = this.state.marginTop + _yoffset * 2;
+          yRightTop = -1;
+          yRightDown = this.state.marginTop + _yoffset;
         }
       }
-      ii++;
-    }
-
-    return _points_to_label_mapping;
-  };
-
-  changeCanAnnotate = async value => {
-    return new Promise(resolve => {
-      this.setState({ canAnnotate: value }, resolve);
-    });
-  };
-
-  // called when label is submitted
-  handleSubmit = async () => {
-    if (hovered_points[0].length || hovered_points[1].length) {
-      await this.changeCanAnnotate(false);
-      let changeHistoryData = this.addToHistory();
-      let addAnnotiationData = this.addAnnotiation();
-      let changePointsLabelsData = this.changePointsLabels();
-
-      //resetting the hovered data after
-      hovered_points = [[], []];
-      hovered_coordinates = [[], []];
-
-      return new Promise(resolve => {
-        this.setState(
-          {
-            history_row_columns: changeHistoryData[0],
-            history_coordinates: changeHistoryData[1],
-            // rows_columns_data: addAnnotiationData[0],
-            coordinates_data: addAnnotiationData[1],
-            points_to_label_mapping: changePointsLabelsData,
-            canAnnotate: true
-          },
-          resolve
-        );
-      });
-    }
-  };
-
-  addToHoveredPoints = (x, y, row, column, grid_number) => {
-    hovered_points[grid_number].push([row, column]);
-    hovered_coordinates[grid_number].push([x, y]);
-  };
-
-  removePointFromLabel = (x, y, row, column, grid_number, label_id) => {
-    let _coordinates_data = this.state.coordinates_data
-    let _index = _coordinates_data[label_id].findIndex(
-      element =>
-        element[0] == x &&
-        element[1] == y
-    );
-    // console.log("*************", x, y, row, column, grid_number, label_id, this.state.coordinates_data, _index)
-    this.setState({coordinates_data:_coordinates_data}, this.addToHoveredPoints(x, y, row, column, grid_number))
-    if (_index >= 0) {
-      if (_coordinates_data[label_id].length == 1) {
-        delete _coordinates_data[label_id];
+    } else {
+      if (y > this.state.marginTop + _yoffset) {
+        yLeft = (y - (this.state.marginTop + _yoffset)) / (_yoffset * 2) + 1;
+        yLeftTop =
+          this.state.marginTop +
+          _yoffset +
+          (Math.floor(yLeft) - 1) * (_yoffset * 2);
+        yLeftDown =
+          this.state.marginTop +
+          _yoffset +
+          (Math.ceil(yLeft) - 1) * (_yoffset * 2);
+        yRight = (y - this.state.marginTop) / (_yoffset * 2) + 1;
+        yRightTop =
+          this.state.marginTop + (Math.floor(yRight) - 1) * (_yoffset * 2);
+        yRightDown =
+          this.state.marginTop + (Math.ceil(yRight) - 1) * (_yoffset * 2);
       } else {
-        _coordinates_data[label_id].splice(_index, 1);
+        if (y < this.state.marginTop) {
+          yLeftTop = -1;
+          yLeftDown = this.state.marginTop + _yoffset;
+          yRightTop = -1;
+          yRightDown = this.state.marginTop;
+        } else {
+          yLeftTop = -1;
+          yLeftDown = this.state.marginTop + _yoffset;
+          yRightTop = this.state.marginTop;
+          yRightDown = this.state.marginTop + _yoffset * 2;
+        }
       }
-    }else{
-
     }
-    // addToHoveredPoints
-    // hovered_points[grid_number].push([row, column]);
-    // hovered_coordinates[grid_number].push([x, y]);
+    return [yLeftTop, yLeftDown, yRightTop, yRightDown];
   };
 
-  // removeFromHoveredPoints = (x, y, row, column, grid_number) => {
-  removeFromHoveredPoints = (
-    coordinates_list,
-    row_column_list,
-    grid_number
-  ) => {
-    let _coordinates_data = this.state.coordinates_data;
-    let _points_to_label_mapping = this.state.points_to_label_mapping;
+  getXCoordinate = (left, right) => {
+    if (left == 0) {
+      return [-1, this.state.marginLeft + xDiff * (right - 1)];
+    } else {
+      return [
+        this.state.marginLeft + xDiff * (left - 1),
+        this.state.marginLeft + xDiff * (right - 1)
+      ];
+    }
+  };
+
+  distanceBetweenPoints = (a, b) => {
+    return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2));
+  };
+
+  getNearestCoordinate = (coordinates_list, x, y, offset_limit) => {
+    // let _distances = []
+    let coordinates = null;
+    let _min = 9999999;
+    let _d = null;
     for (let i = 0; i < coordinates_list.length; i++) {
-      for (let key in _coordinates_data) {
-        let _index = _coordinates_data[key].findIndex(
-          element =>
-            element[0] == coordinates_list[i][0] &&
-            element[1] == coordinates_list[i][1]
-        );
-        if (_index >= 0) {
-          if (_coordinates_data[key].length == 1) {
-            delete _coordinates_data[key];
+      _d = this.distanceBetweenPoints(coordinates_list[i], [x, y]);
+      if (_d < _min) {
+        _min = _d;
+        coordinates = coordinates_list[i];
+      }
+    }
+
+    if (_min > offset_limit) {
+      return null;
+    }
+
+    return coordinates;
+  };
+
+  paintCoordinate = (ctx, _coordinate, value) => {
+    if (_coordinate) {
+      if (value["id"] in this.labels_visited) {
+      } else {
+        this.labels_visited[value["id"]] = true;
+      }
+      if (_coordinate[0] in this.points_label_map) {
+        if (_coordinate[1] in this.points_label_map[_coordinate[0]]) {
+          if (
+            this.points_label_map[_coordinate[0]][_coordinate[1]]["id"] !==
+            value["id"]
+          ) {
+            this.temp_stack.push(_coordinate);
+            if (value["color_id"] == -1) {
+              // console.log("*************", this.undo_stack, this.redo_stack, _coordinate)
+              this.redo_stack = [];
+              this.drawDots(
+                ctx,
+                _coordinate[0],
+                _coordinate[1],
+                2.2,
+                default_color
+              );
+              delete this.points_label_map[_coordinate[0]][_coordinate[1]];
+            } else {
+              this.points_label_map[_coordinate[0]][_coordinate[1]] = value;
+              // console.log("*************", this.undo_stack, this.redo_stack, _coordinate)
+              this.redo_stack = [];
+              this.drawDots(
+                ctx,
+                _coordinate[0],
+                _coordinate[1],
+                2,
+                colors[value["color_id"]]
+              );
+            }
+          }
+        } else {
+          this.temp_stack.push(_coordinate);
+          if (value["color_id"] == -1) {
           } else {
-            _coordinates_data[key].splice(_index, 1);
+            this.points_label_map[_coordinate[0]][_coordinate[1]] = value;
+            // console.log("*************", this.undo_stack, this.redo_stack, _coordinate)
+            this.redo_stack = [];
+            this.drawDots(
+              ctx,
+              _coordinate[0],
+              _coordinate[1],
+              2,
+              colors[value["color_id"]]
+            );
+          }
+        }
+      } else {
+        this.temp_stack.push(_coordinate);
+        if (value["color_id"] == -1) {
+        } else {
+          this.points_label_map[_coordinate[0]] = {
+            [_coordinate[1]]: value
+          };
+          // console.log("*************", this.undo_stack, this.redo_stack, _coordinate)
+          this.redo_stack = [];
+          this.drawDots(
+            ctx,
+            _coordinate[0],
+            _coordinate[1],
+            2,
+            colors[value["color_id"]]
+          );
+        }
+      }
+    }
+  };
+
+  labelDots = (x, y, value, offset_limit) => {
+    const canvas = this.refs.canvas;
+    const ctx = canvas.getContext("2d");
+
+    let _x_number, _x_numberLeft, _x_numberRight;
+
+    let coordinates_list = [];
+
+    if (x - this.state.marginLeft > 0) {
+      _x_number = (x - this.state.marginLeft) / xDiff + 1;
+      _x_numberLeft = Math.floor(_x_number);
+      _x_numberRight = Math.ceil(_x_number);
+    } else {
+      _x_numberLeft = 0;
+      _x_numberRight = 1;
+    }
+    [_x_numberLeft, _x_numberRight] = this.getXCoordinate(
+      _x_numberLeft,
+      _x_numberRight
+    );
+
+    let yList = this.getYCoordinated(_x_number, y);
+
+    for (let i = 0; i < 2; i++) {
+      if (yList[i] !== -1 && _x_numberLeft !== -1) {
+        coordinates_list.push([_x_numberLeft, yList[i]]);
+      }
+    }
+    for (let i = 2; i < 4; i++) {
+      if (yList[i] !== -1 && _x_numberRight !== -1) {
+        coordinates_list.push([_x_numberRight, yList[i]]);
+      }
+    }
+
+    let _coordinate = this.getNearestCoordinate(
+      coordinates_list,
+      x,
+      y,
+      offset_limit
+    );
+    if (value["id"] == -1 || value["color_id"] == -1) {
+      // erased_points
+      if (_coordinate) {
+        if (_coordinate[0] in this.erased_points) {
+          this.erased_points[_coordinate[0]][_coordinate[1]] = true;
+        } else {
+          this.erased_points[_coordinate[0]][_coordinate[1]] = true;
+        }
+      }
+    } else {
+      if (_coordinate) {
+        if (
+          _coordinate[0] in this.erased_points &&
+          _coordinate[1] in this.erased_points[_coordinate[0]]
+        ) {
+          delete this.erased_points[[_coordinate[0]]][_coordinate[1]];
+        }
+      }
+    }
+    console.log(
+      "@@@@@@@@@@@@@@@@@@@@",
+      _coordinate,
+      x,
+      y,
+      value,
+      coordinates_list
+    );
+    this.paintCoordinate(ctx, _coordinate, value);
+  };
+
+  drawDots = (ctx, x, y, radius, color) => {
+    ctx.arc(x, y, radius + sizeOffset, 0, 2 * Math.PI);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.beginPath();
+  };
+
+  drawDefaultDots = ctx => {
+    let _temp = 0;
+    for (
+      let x = this.state.marginLeft;
+      x < this.state.width;
+      x = x + xDiff, _temp++
+    ) {
+      for (
+        let y = this.state.marginTop;
+        y < this.state.height;
+        y = y + _yoffset * 2
+      ) {
+        if (_temp % 2 == 0) {
+          this.drawDots(ctx, x, y + _yoffset, 2, default_color);
+        } else {
+          this.drawDots(ctx, x, y, 2, default_color);
+        }
+      }
+    }
+  };
+
+  getMousePos(canvas, evt) {
+    var rect = canvas.getBoundingClientRect();
+    return {
+      x: evt.clientX - rect.left,
+      y: evt.clientY - rect.top
+    };
+  }
+
+  deleteFromPointsLabelMap = (x, y) => {
+    if (x in this.points_label_map && y in this.points_label_map[x]) {
+      delete this.points_label_map[x][y];
+    }
+  };
+
+  undo = () => {
+    if (this.undo_stack.length > 0) {
+      let last = this.undo_stack.pop();
+      this.redo_stack.push(last);
+      const canvas = this.refs.canvas;
+      const ctx = canvas.getContext("2d");
+      for (let i = 0; i < last["points"].length; i++) {
+        this.drawDots(
+          ctx,
+          last["points"][i][0],
+          last["points"][i][1],
+          2.2,
+          default_color
+        );
+        this.deleteFromPointsLabelMap(
+          last["points"][i][0],
+          last["points"][i][1]
+        );
+      }
+      if (this.undo_stack.length > 0) {
+        last = this.undo_stack[this.undo_stack.length - 1];
+        for (let i = 0; i < last["points"].length; i++) {
+          if (last["color_id"] == -1) {
+          } else {
+            this.paintCoordinate(
+              ctx,
+              [last["points"][i][0], last["points"][i][1]],
+              { color_id: last["color_id"], id: last["id"] }
+            );
           }
         }
       }
+    }
+    // console.log("*************", this.undo_stack, this.redo_stack)
+  };
 
-      if (
-        row_column_list[i][0] in _points_to_label_mapping[grid_number] &&
-        row_column_list[i][1] in
-          _points_to_label_mapping[grid_number][row_column_list[i][0]]
-      ) {
-        delete _points_to_label_mapping[grid_number][row_column_list[i][0]][
-          row_column_list[i][1]
-        ];
+  redo = () => {
+    if (this.redo_stack.length > 0) {
+      let last = this.redo_stack.pop();
+      this.undo_stack.push(last);
+      const canvas = this.refs.canvas;
+      const ctx = canvas.getContext("2d");
+      for (let i = 0; i < last["points"].length; i++) {
+        if (last["color_id"] == -1) {
+          this.paintCoordinate(
+            ctx,
+            [last["points"][i][0], last["points"][i][1]],
+            { color_id: -1, id: -1 }
+          );
+        } else {
+          this.paintCoordinate(
+            ctx,
+            [last["points"][i][0], last["points"][i][1]],
+            { color_id: last["color_id"], id: last["id"] }
+          );
+        }
+      }
+    }
+  };
+
+  getPayload = () => {
+    let _data = [];
+    let _label_data = {};
+    let is_data_present = false;
+
+    for (let label_id in this.labels_visited) {
+      if (label_id in _label_data || label_id == -1) {
+      } else {
+        _label_data[label_id] = {
+          labelIds: [label_id],
+          mode: "view",
+          status: "new",
+          type: "polygon",
+          data: []
+        };
       }
     }
 
-    this.setState({
-      coordinates_data: _coordinates_data,
-      points_to_label_mapping: _points_to_label_mapping
-    });
-  };
-
-  setModalShow = value => {
-    this.setState({ modalShow: value });
-  };
-
-  onClickNextButton = async imageProp => {
-    await this.handleSubmit();
-    if (Object.keys(this.state.coordinates_data).length !== 0) {
-      this.postAnnotationAsync().then(data => {
-        this.setState({ posting: false }, () => {
-          this.reset(this.props.nextImage);
+    for (let x in this.points_label_map) {
+      for (let y in this.points_label_map[x]) {
+        is_data_present = true;
+        _label_data[this.points_label_map[x][y]["id"]]["data"].push({
+          x: x,
+          y: y
         });
-      });
-    } else {
-      this.reset(this.props.nextImage);
-    }
-  };
-
-  onClickFinishButton = async imageProp => {
-    await this.handleSubmit();
-    if (Object.keys(this.state.coordinates_data).length !== 0) {
-      this.postAnnotationAsync().then(data => {
-        this.setState({ redirect: true });
-      });
-    } else {
-      this.setState({ redirect: true });
-    }
-  };
-
-  renderNextButton = () => {
-    if (this.state.redirect) {
-      return <Redirect to="/dashboard" />;
-    }
-    if (this.props.annos.image.isLast) {
-      return (
-        <Button
-          type="button"
-          variant="danger"
-          onClick={() => {
-            this.onClickFinishButton();
-          }}
-        >
-          Finish
-        </Button>
-      );
-      //
-    } else {
-      return (
-        <Button
-          type="button"
-          disabled={this.state.posting}
-          onClick={() => {
-            this.onClickNextButton();
-          }}
-        >
-          {this.state.posting ? (
-            <Spinner
-              as="span"
-              animation="border"
-              size="sm"
-              role="status"
-              aria-hidden="true"
-            />
-          ) : (
-            "Next Image"
-          )}
-        </Button>
-      );
-    }
-  };
-
-  postAnnotationAsync = () => {
-    let payload;
-    let data = [];
-    let label_data = {};
-    for (let key in this.state.coordinates_data) {
-      label_data = {
-        labelIds: [key],
-        mode: "view",
-        status: "new",
-        type: "polygon",
-        data: []
-      };
-      for (let co of this.state.coordinates_data[key]) {
-        label_data["data"].push({ x: co[0], y: co[1] });
       }
-      data.push(label_data);
     }
-    payload = {
+
+    for (let label_id in this.labels_visited) {
+      if (label_id in _label_data && _label_data[label_id]["data"].length > 0) {
+        _data.push(_label_data[label_id]);
+      }
+    }
+
+    let payload = {
       imgId: this.props.imageId,
       imgLabelIds: [],
       imgLabelChanged: false,
@@ -487,399 +442,379 @@ export default class Image extends React.Component {
         bBoxes: [],
         lines: [],
         points: [],
-        polygons: data
+        polygons: _data
       },
       isJunk: null
     };
-    this.setState({ posting: true });
-
-    return axios
-      .post(API_URL + "/sia/update", payload)
-      .then(response => {
-        return response;
-      })
-      .catch(e => {
-        return e;
-      });
-    // return axios.get(API_URL + '/sia/label').then((response)=>{return response}).catch(e=> {return e} )
+    if (is_data_present == true) {
+      return payload;
+    } else {
+      return null;
+    }
   };
 
-  renderPrevButton = () => {
+  nextImage = () => {
+    this.setState({ posting: true }, () => {
+      let payload = this.getPayload();
+      if (payload !== null) {
+        saveAnnotationApi(payload).then(response => {
+          this.setState({ posting: false }, () => {
+            this.points_label_map = {};
+            this.undo_stack = [];
+            this.redo_stack = [];
+            this.props.nextImage();
+          });
+        });
+      } else {
+        this.setState({ posting: false }, () => {
+          this.points_label_map = {};
+          this.undo_stack = [];
+          this.redo_stack = [];
+          this.props.nextImage();
+        });
+      }
+    });
+  };
+
+  prevImage = () => {
+    this.setState({ posting: true }, () => {
+      let payload = this.getPayload();
+
+      if (payload !== null) {
+        saveAnnotationApi(payload).then(response => {
+          this.setState({ posting: false }, () => {
+            this.points_label_map = {};
+            this.undo_stack = [];
+            this.redo_stack = [];
+            this.props.prevImage();
+          });
+        });
+      } else {
+        this.setState({ posting: false }, () => {
+          this.points_label_map = {};
+          this.undo_stack = [];
+          this.redo_stack = [];
+          this.props.prevImage();
+        });
+      }
+    });
+  };
+
+  finish = () => {
+    this.setState({ posting: true }, () => {
+      let payload = this.getPayload();
+      // console.log("!@!@!@!@!@!@", payload);
+
+      saveAnnotationApi(payload).then(response => {
+        this.setState({ posting: false }, () => {
+          this.points_label_map = {};
+          this.undo_stack = [];
+          this.redo_stack = [];
+          this.setState({ redirect: true });
+        });
+      });
+    });
+  };
+
+  onChangeOfLabel = (_value, _index) => {
+    let value = _value;
+    if (value["id"] === -1) {
+      value["color_id"] = -1;
+    } else {
+      value["color_id"] = _index;
+    }
+    this.setState({
+      value: value
+    });
+  };
+
+  renderLabels = _labels => {
+    let labels = require("rfdc")({ proto: true })(_labels);
+    let returnElement = [];
+    labels.unshift({
+      id: -1,
+      label: "Remove Label",
+      nameAndClass: "Consolidation (Covid19)",
+      description: ""
+    });
+    for (let i = 0; i < labels.length; i++) {
+      returnElement.push(
+        <div className="input-screen">
+          <input
+            type="radio"
+            // checked={value.label === this.state.value.label}
+            name="colors"
+            onChange={e => {
+              this.onChangeOfLabel(labels[i], i);
+            }}
+          />
+          <div style={{ marginLeft: 10 }}>{labels[i].label}</div>
+          <div
+            style={{
+              marginLeft: 10,
+              backgroundColor: labels[i].id == -1 ? default_color : colors[i],
+              height: 10,
+              width: 10
+            }}
+          />
+        </div>
+      );
+    }
+
+    return returnElement;
+  };
+
+  renderLeftSideControls = () => {
     return (
-      <Button
-        type="button"
-        disabled={this.state.posting}
-        onClick={() => {
-          this.onClickPrevButton();
-        }}
-      >
+      <div>
+        <div
+          onClick={() => {
+            console.log("!!!!!!!!", this.points_label_map);
+          }}
+        >
+          {" "}
+          console
+        </div>
+        <h5 style={{ textAlign: "center" }}>
+          <u>Select a label</u>
+        </h5>
+        {this.props.labels.length ? this.renderLabels(this.props.labels) : null}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            justifyContent: "space-around",
+            marginTop: 20
+          }}
+        >
+          <Button type="button" onClick={() => this.undo()}>
+            Undo
+          </Button>
+          <Button type="button" onClick={() => this.redo()}>
+            Redo
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  renderPreviousButton = () => {
+    return (
+      <Button type="button" onClick={() => this.prevImage()}>
         Previous Image
       </Button>
     );
   };
 
-  onClickPrevButton = async imageProp => {
-    await this.handleSubmit();
-    if (Object.keys(this.state.coordinates_data).length !== 0) {
-      this.postAnnotationAsync().then(data => {
-        this.setState({ posting: false }, () => {
-          this.reset(this.props.prevImage);
-        });
-      });
-    } else {
-      this.reset(this.props.prevImage);
-    }
+  renderNextButton = () => {
+    return (
+      <Button type="button" onClick={() => this.nextImage()}>
+        Next Image
+      </Button>
+    );
   };
 
-  onChangeOfLabel = async (value, index) => {
-    await this.handleSubmit();
-    if (value.label == "erase") {
-      this.setState({
-        value: { label: value.label, id: value.id },
-        color: "grey"
-      });
-    } else {
-      this.setState({
-        value: { label: value.label, id: value.id },
-        color: this.props.colors[index]
-      });
-    }
+  renderFinishButton = () => {
+    return (
+      <Button type="button" onClick={() => this.finish()}>
+        Finish
+      </Button>
+    );
   };
 
-  undo = async () => {
-    await this.changeCanAnnotate(false);
-    if (this.state.history_coordinates.length > 0) {
-      let _history_coordinates = this.state.history_coordinates;
-      let _history_row_columns = this.state.history_row_columns;
-      let _last_element_coordinates =
-        _history_coordinates[_history_coordinates.length - 1];
-      let _last_element_row_column =
-        _history_row_columns[_history_row_columns.length - 1];
-      _history_coordinates.pop();
-      _history_row_columns.pop();
-      this.removeFromHoveredPoints(
-        _last_element_coordinates["points"][0],
-        _last_element_row_column["points"][0],
-        0
-      );
-      this.removeFromHoveredPoints(
-        _last_element_coordinates["points"][1],
-        _last_element_row_column["points"][1],
-        1
-      );
-      this.setState({
-        history_coordinates: _history_coordinates,
-        history_row_columns: _history_row_columns,
-        is_undo_disabled: false,
-        canAnnotate: true
-      });
-    } else {
-      if (this.state.is_undo_disabled == true) {
-        this.setState({
-          is_undo_disabled: false,
-          canAnnotate: true
-        });
+  componentDidUpdate(prevProps, prevState, snapshot) {
+    // if(this.state.deletelater_index!=prevState.deletelater_index){
+    //   this.points_label_map={}
+    //   this.undo_stack = []
+    //   this.redo_stack = []
+    //   const canvas = this.refs.canvas;
+    //   const ctx = canvas.getContext("2d");
+    //   var _img_ = new Image();
+    //   _img_.onload = () => {
+    //     let _marinLeft = (this.props.imageId % 10) + minimum_left_margin;
+    //     let _marinTop = (this.props.imageId % 10) + minimum_top_margin;
+    //     this.setState(
+    //       {
+    //         width: _img_.width,
+    //         height: _img_.height,
+    //         marginLeft: _marinLeft,
+    //         marginTop: _marinTop,
+    //         imageLoading: false
+    //       },
+    //       () => {
+    //         ctx.drawImage(_img_, 0, 0);
+    //         this.drawDefaultDots(ctx);
+    //       }
+    //     );
+    //   };
+    //   _img_.src = this.deletelater_image[this.state.deletelater_index]
+    // }
+  }
+
+  getColorIndex = (data, labels, all_colors) => {
+    for (let label_index = 0; label_index < labels.length; label_index++) {
+      if (labels[label_index]["id"] == data["labelIds"][0]) {
+        return label_index + 1;
       }
     }
   };
 
-  renderLabels = () => {
-    return (
-      <React.Fragment>
-        <div className="input-screen-erase">
-          <input
-            type="radio"
-            checked={this.state.value.label === "erase"}
-            name="colors"
-            onChange={e => {
-              this.onChangeOfLabel({ label: "erase", id: -1 }, -1);
-            }}
-          />
-          <div style={{ marginLeft: 20 }}>{"Erase annotated points"}</div>
-        </div>
-        {this.props.labels.map((value, index) => {
-          if (value.label in colors) {
+  drawOrigionalpoints = () => {
+    let data = {};
+    if (this.props.annos.annotations.polygons.length) {
+      for (let i of this.props.annos.annotations.polygons) {
+        let color_index = this.getColorIndex(i, this.props.labels, colors);
+        console.log("%%%%%%", color_index);
+        for (let j of i.data) {
+          if (j.x in data) {
+            // this.labelDots(686.53125, 302, {'id':i['labelIds'][0], 'color_id': color_index})
+            this.labelDots(
+              j.x,
+              j.y,
+              { id: i["labelIds"][0], color_id: color_index },
+              0.4
+            );
           } else {
-            colors[value.id] = this.props.colors[index];
+            data[j.x] = {};
           }
-          if (value.id in label_id_to_label) {
-          } else {
-            label_id_to_label[value.id] = value.label;
-          }
-
-          return (
-            <div className="input-screen">
-              <input
-                type="radio"
-                checked={value.label === this.state.value.label}
-                name="colors"
-                onChange={e => {
-                  this.onChangeOfLabel(value, index);
-                }}
-              />
-              <div style={{ marginLeft: 10 }}>{value.label}</div>
-              <div
-                style={{
-                  marginLeft: 10,
-                  backgroundColor: this.props.colors[index],
-                  height: 10,
-                  width: 10
-                }}
-              />
-            </div>
-          );
-        })}
-      </React.Fragment>
+          data[j.x][j.y] = i.labelIds[0];
+        }
+      }
+    }
+    this.points_label_map_original = data;
+    console.log(
+      this.props.imageUrl,
+      "!!!!!!!!!!!!!!!!!!!!",
+      this.props.annos.annotations.polygons,
+      data,
+      this.props.labels,
+      this.points_label_map_original,
+      this.points_label_map
     );
   };
 
-  renderImage = () => {
-    return (
-      <div
-        onMouseDown={e => {
-          this.setStateWrapper({ is_mousedown: true });
-        }}
-        onMouseUp={e => {
-          this.setStateWrapper({ is_mousedown: false }, this.handleSubmit());
-        }}
-        id="imageComponent"
-        style={{
-          width: this.state.imageDimentions.width
-            ? this.state.imageDimentions.width
-            : 0,
-          margin: "auto",
-          position: "relative"
-        }}
-        className="selectDisable"
-      >
-        <img
-          ref={this.myRef}
-          alt="annotation display"
-          onLoad={this.onImgLoad}
-          src={this.props.imageUrl}
-          className="image"
-          draggable="false"
-        />
+  componentDidMount() {
+    const canvas = this.refs.canvas;
+    const ctx = canvas.getContext("2d");
+    var _img_ = new Image();
 
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            marginTop: this.state.yOffset,
-            left: this.state.xOffset,
-            width: this.state.imageDimentions.width
-              ? this.state.imageDimentions.width + 30
-              : 0
-          }}
-        >
-          <Grid
-            xOffsetAddition={0}
-            yOffsetAddition={0}
-            xOffset={this.state.xOffset}
-            yOffset={this.state.yOffset}
-            random_offset={this.random_offset}
-            colors={this.state.colors}
-            static_data={this.state.static_data}
-            imageRef={this.myRef}
-            xMargin={
-              this.myRef.current
-                ? this.myRef.current.getBoundingClientRect()["x"]
-                : null
-            }
-            yMargin={
-              this.myRef.current
-                ? this.myRef.current.getBoundingClientRect()["y"]
-                : null
-            }
-            color={this.state.color}
-            label={this.state.value.label}
-            label_id={this.state.value.id}
-            image_url={this.props.imageUrl}
-            key={"0grid"}
-            grid_number={0}
-            points_to_label_mapping={this.state.points_to_label_mapping[0]}
-            rows_columns_data={this.state.rows_columns_data}
-            addToHoveredPoints={this.addToHoveredPoints}
-            removeFromHoveredPoints={this.removeFromHoveredPoints}
-            imageDimentions={this.state.imageDimentions}
-            is_mousedown={this.state.is_mousedown}
-            removePointFromLabel={this.removePointFromLabel}
-          />
-        </div>
+    _img_.onload = () => {
+      let _marinLeft = (this.props.imageId % 10) + minimum_left_margin;
+      let _marinTop = (this.props.imageId % 10) + minimum_top_margin;
+      this.setState(
+        {
+          width: _img_.width,
+          height: _img_.height,
+          marginLeft: _marinLeft,
+          marginTop: _marinTop
+          // imageLoading: false
+        },
+        () => {
+          ctx.drawImage(_img_, 0, 0);
+          this.drawDefaultDots(ctx);
+          this.drawOrigionalpoints();
+        }
+      );
+    };
 
-        <div
-          // onMouseDown={e => {
-          //   this.setStateWrapper({ is_mousedown: true });
-          // }}
-          // onMouseUp={e => {
-          //   this.setStateWrapper({ is_mousedown: false }, this.handleSubmit());
-          //   // await this.handleSubmit();
-          // }}
-          style={{
-            position: "absolute",
-            top: yOffsetAddition,
-            marginTop: this.state.yOffset,
-            left: this.state.xOffset + xOffsetAddition,
-            width: this.state.imageDimentions.width
-              ? this.state.imageDimentions.width + 30
-              : 0
-          }}
-        >
-          <Grid
-            xOffsetAddition={xOffsetAddition}
-            yOffsetAddition={yOffsetAddition}
-            xOffset={this.state.xOffset}
-            yOffset={this.state.yOffset}
-            random_offset={this.random_offset}
-            colors={this.state.colors}
-            static_data={this.state.static_data}
-            imageRef={this.myRef}
-            xMargin={
-              this.myRef.current
-                ? this.myRef.current.getBoundingClientRect()["x"]
-                : null
-            }
-            yMargin={
-              this.myRef.current
-                ? this.myRef.current.getBoundingClientRect()["y"]
-                : null
-            }
-            color={this.state.color}
-            label={this.state.value.label}
-            label_id={this.state.value.id}
-            image_url={this.props.imageUrl}
-            key={"1grid"}
-            grid_number={1}
-            points_to_label_mapping={this.state.points_to_label_mapping[1]}
-            rows_columns_data={this.state.rows_columns_data}
-            addToHoveredPoints={this.addToHoveredPoints}
-            removeFromHoveredPoints={this.removeFromHoveredPoints}
-            imageDimentions={this.state.imageDimentions}
-            is_mousedown={this.state.is_mousedown}
-            removePointFromLabel={this.removePointFromLabel}
-          />
-        </div>
-      </div>
+    // _img_.src = "https://www.telegraph.co.uk/content/dam/news/2017/11/11/Lam1_trans%2B%2BnAdySV0BR-4fDN_-_p756cVfcy8zLGPV4EhRkjQy7tg.jpg";
+    _img_.src = this.props.imageUrl;
+
+    // for
+    // _img_.src = this.deletelater_image[this.state.deletelater_index];
+
+    canvas.addEventListener(
+      "mousemove",
+      evt => {
+        if (this.isMouseDown == true && this.state.value !== null) {
+          var mousePos = this.getMousePos(canvas, evt);
+          this.labelDots(mousePos.x, mousePos.y, this.state.value, 9);
+        }
+      },
+      false
     );
-  };
 
-  renderControls = () => {
-    return (
-      <div
-        style={{
-          // marginTop: 10,
-          // borderStyle: "solid",
-          // borderColor: "red",
-          justifyContent: "space-around"
-        }}
-        className="center-screen"
-      >
-        <div>
-          <div style={{ marginBottom: 5, textDecoration: "underline" }}>
-            <b>Select a label</b>
-          </div>
-          {this.props.labels.length ? this.renderLabels() : null}
-
-          <div style={{ marginTop: 20, marginBottom: 20 }}>
-            <Button
-              variant="warning"
-              type="button"
-              onClick={() => this.setModalShow(true)}
-            >
-              Instructions
-            </Button>
-
-            <InstructionModal
-              show={this.state.modalShow}
-              onHide={() => this.setModalShow(false)}
-            />
-          </div>
-          <div style={{ marginTop: 20, marginBottom: 20 }}>
-            <Button
-              variant="danger"
-              type="button"
-              onClick={() => this.reset(() => {})}
-            >
-              Delete All Unsaved Annotations
-            </Button>
-          </div>
-          <div
-            style={{
-              marginTop: 20,
-              marginBottom: 20,
-              display: "flex",
-              justifyContent: "space-around"
-            }}
-          >
-            <Button
-              variant="warning"
-              type="button"
-              disabled={this.state.is_undo_disabled}
-              onClick={() => {
-                this.setState({ is_undo_disabled: true }, this.undo);
-              }}
-            >
-              Undo
-            </Button>
-            <Button
-              variant="warning"
-              type="button"
-              onClick={() => this.reset(() => {})}
-            >
-              Redo
-            </Button>
-          </div>
-        </div>
-      </div>
+    canvas.addEventListener(
+      "mousedown",
+      evt => {
+        this.isMouseDown = true;
+      },
+      false
     );
-  };
+
+    canvas.addEventListener(
+      "mouseup",
+      evt => {
+        this.isMouseDown = false;
+        if (this.state.value !== null && this.temp_stack.length > 0) {
+          this.undo_stack.push({
+            points: this.temp_stack,
+            id: this.state.value["id"],
+            color_id: this.state.value["color_id"]
+          });
+          this.temp_stack = [];
+        }
+        // console.log("@@@@@@@@@@@@@@points_label_map", this.points_label_map);
+      },
+      false
+    );
+
+    canvas.addEventListener(
+      "mouseleave",
+      evt => {
+        this.isMouseDown = false;
+        if (this.state.value !== null && this.temp_stack.length > 0) {
+          this.undo_stack.push({
+            points: this.temp_stack,
+            id: this.state.value["id"],
+            color_id: this.state.value["color_id"]
+          });
+          this.temp_stack = [];
+        }
+      },
+      false
+    );
+  }
 
   render() {
-    console.log(
-      "!!!!!@@@@@!!!!!",
-      this.state.coordinates_data
-    );
-    if (document.getElementById("imageComponent")) {
-      document.getElementById("imageComponent").style.cursor = this.state
-        .canAnnotate
-        ? "crosshair"
-        : "wait";
-    }
-    if (document.getElementById("container")) {
-      if (this.state.canAnnotate) {
-        document.getElementById("container").style.cursor = "auto";
-      } else {
-        document.getElementById("container").style.cursor = "wait";
-      }
-    }
     return (
-      <div
-        id="imageParent"
-        style={{ backgroundColor: "grey", overflow: "auto" }}
-        id="container"
-      >
+      <div style={{ overflow: "auto", backgroundColor: "grey" }}>
+        {this.state.redirect ? <Redirect to="/dashboard" /> : null}
         <div style={{ textAlign: "center", color: "white", marginBottom: 30 }}>
           {this.props.annos.image.url}
         </div>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "row",
-            marginLeft: 20,
-            marginRight: 20
-          }}
-        >
-          <div style={{ marginTop: 30 }}>{this.renderPrevButton()}</div>
-          <div style={{ flex: 0.5 }}>{this.renderControls()}</div>
-          <div style={{ flex: 2.5 }}>
-            {this.state.xOffset == 0 || this.state.yOffset == 0
-              ? null
-              : this.renderImage()}
+        <div style={{ display: "flex", flexDirection: "row" }}>
+          <div
+            style={{
+              borderStyle: "solid",
+              borderColor: "green",
+              marginLeft: 10
+            }}
+          >
+            {this.renderPreviousButton()}
           </div>
-          <div style={{ marginTop: 30 }}>{this.renderNextButton()}</div>
+          <div className="left-control">{this.renderLeftSideControls()}</div>
+          <canvas
+            // id="canvasid"
+            ref="canvas"
+            width={this.state.width}
+            height={this.state.height}
+          />
+          <div
+            style={{
+              borderStyle: "solid",
+              borderColor: "green",
+              marginLeft: 10,
+              marginRight: 20
+            }}
+          >
+            {this.props.annos.image.isLast
+              ? this.renderFinishButton()
+              : this.renderNextButton()}
+          </div>
         </div>
-        <div style={{ marginBottom: 30, height: 30 }} />
       </div>
     );
   }
 }
+export default Canvas;
