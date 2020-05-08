@@ -179,3 +179,10 @@ export {distance_between_two_vertical_points, minimum_left_margin, minimum_top_m
 //     },
 //     "isJunk": null
 //   }
+
+
+
+
+
+
+// {'imgId': 378, 'imgLabelIds': [], 'imgLabelChanged': False, 'annotations': {'bBoxes': [], 'lines': [], 'points': [{'type': 'point', 'data': {'x': 0.29869322080425675, 'y': 0.3246492985971944}, 'mode': 'view', 'status': 'new', 'labelIds': [36], 'selectedNode': 0}, {'type': 'point', 'data': {'x': 0.5882208927489366, 'y': 0.27054108216432865}, 'mode': 'view', 'status': 'new', 'labelIds': [36], 'selectedNode': 0}, {'type': 'point', 'data': {'x': 0.33036030992320614, 'y': 0.6112224448897795}, 'mode': 'view', 'status': 'new', 'labelIds': [36], 'selectedNode': 0}, {'type': 'point', 'data': {'x': 0.644015287863276, 'y': 0.6072144288577155}, 'mode': 'view', 'status': 'new', 'labelIds': [36], 'selectedNode': 0}], 'polygons': []}, 'isJunk': None}

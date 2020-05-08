@@ -13,12 +13,11 @@ import Button from "react-bootstrap/Button";
 import { Redirect } from "react-router-dom";
 import { saveAnnotationApi } from "../../api/image";
 
-var url = require("url");
-var http = require("http");
-
 var _yoffset = Math.sqrt(2 * xDiff * (2 * xDiff) - xDiff * xDiff);
 
-var sizeOffset = 0;
+let controlPressed = false;
+let zPrressed = false;
+let shiftPressed = false
 
 class Canvas extends React.Component {
   constructor(props) {
@@ -27,15 +26,8 @@ class Canvas extends React.Component {
     this.undo_stack = [];
     this.redo_stack = [];
     this.temp_stack = [];
-    this.deletelater_image = [
-      "https://www.telegraph.co.uk/content/dam/news/2017/11/11/Lam1_trans%2B%2BnAdySV0BR-4fDN_-_p756cVfcy8zLGPV4EhRkjQy7tg.jpg",
-      "https://i.ytimg.com/vi/k8EURBL53_k/maxresdefault.jpg",
-      "https://media1.s-nbcnews.com/j/newscms/2014_22/469446/boeing-b52-conect1_0a6eb1293b9fa36dbab1b9cac9c7d16b.fit-760w.jpg"
-    ];
     this.points_label_map = {};
     this.points_label_map_original = {};
-    this.labels_visited = {};
-    this.erased_points = {};
     this.state = {
       width: null,
       height: null,
@@ -48,6 +40,39 @@ class Canvas extends React.Component {
       redirect: false
     };
   }
+
+  keyDown = e => {
+    if (controlPressed == false && e.keyCode == 17) {
+      controlPressed = true;
+    }
+
+    if (controlPressed == true && zPrressed == false && e.keyCode == 90) {
+      if(shiftPressed == true){
+        this.redo()
+      }else{
+        this.undo();
+      }
+    }
+
+    if (zPrressed == false && e.keyCode == 90) {
+      zPrressed = true;
+    }
+    if (shiftPressed == false && e.keyCode == 16) {
+      shiftPressed = true;
+    }
+  };
+
+  keyUp = e => {
+    if (zPrressed == true && e.keyCode == 90) {
+      zPrressed = false;
+    }
+    if (controlPressed == true && e.keyCode == 17) {
+      controlPressed = false;
+    }
+    if (shiftPressed == true && e.keyCode == 16) {
+      shiftPressed = false;
+    }
+  };
 
   getYCoordinated = (x, y) => {
     let yLeft = null;
@@ -146,29 +171,35 @@ class Canvas extends React.Component {
         coordinates = coordinates_list[i];
       }
     }
-
-    if (_min >= offset_limit) {
+    if (_min > offset_limit) {
       return null;
     }
 
     return coordinates;
   };
 
-  paintCoordinate = (ctx, _coordinate, value) => {
+  paintCoordinate = (ctx, _coordinate, value, add_to_stack = true) => {
     if (_coordinate) {
-      if (value["id"] in this.labels_visited) {
-      } else {
-        this.labels_visited[value["id"]] = true;
-      }
       if (_coordinate[0] in this.points_label_map) {
         if (_coordinate[1] in this.points_label_map[_coordinate[0]]) {
+          // point already colored
+
           if (
             this.points_label_map[_coordinate[0]][_coordinate[1]]["id"] !==
             value["id"]
           ) {
-            this.temp_stack.push(_coordinate);
+            // hovered over already colored point with a different color
             if (value["color_id"] == -1) {
-              this.redo_stack = [];
+              // erase colored points
+              if (add_to_stack == true) {
+                this.temp_stack.push([
+                  ..._coordinate,
+                  this.points_label_map[_coordinate[0]][_coordinate[1]]["id"],
+                  this.points_label_map[_coordinate[0]][_coordinate[1]][
+                    "color_id"
+                  ]
+                ]);
+              }
               this.drawDots(
                 ctx,
                 _coordinate[0],
@@ -178,8 +209,11 @@ class Canvas extends React.Component {
               );
               delete this.points_label_map[_coordinate[0]][_coordinate[1]];
             } else {
+              // hovered over already colored point with a different color
               this.points_label_map[_coordinate[0]][_coordinate[1]] = value;
-              this.redo_stack = [];
+              if (add_to_stack == true) {
+                this.temp_stack.push(_coordinate);
+              }
               this.drawDots(
                 ctx,
                 _coordinate[0],
@@ -190,11 +224,14 @@ class Canvas extends React.Component {
             }
           }
         } else {
-          this.temp_stack.push(_coordinate);
+          // point not colored
+
           if (value["color_id"] == -1) {
           } else {
             this.points_label_map[_coordinate[0]][_coordinate[1]] = value;
-            this.redo_stack = [];
+            if (add_to_stack == true) {
+              this.temp_stack.push(_coordinate);
+            }
             this.drawDots(
               ctx,
               _coordinate[0],
@@ -205,13 +242,16 @@ class Canvas extends React.Component {
           }
         }
       } else {
-        this.temp_stack.push(_coordinate);
+        // point not colored
+
         if (value["color_id"] == -1) {
         } else {
           this.points_label_map[_coordinate[0]] = {
             [_coordinate[1]]: value
           };
-          this.redo_stack = [];
+          if (add_to_stack == true) {
+            this.temp_stack.push(_coordinate);
+          }
           this.drawDots(
             ctx,
             _coordinate[0],
@@ -224,7 +264,7 @@ class Canvas extends React.Component {
     }
   };
 
-  labelDots = (x, y, value, offset_limit) => {
+  labelDots = (x, y, value, offset_limit, add_to_stack = true) => {
     const canvas = this.refs.canvas;
     const ctx = canvas.getContext("2d");
 
@@ -265,35 +305,11 @@ class Canvas extends React.Component {
       offset_limit
     );
 
-    if (value["id"] == -1 || value["color_id"] == -1) {
-      // erased_points
-      if (
-        _coordinate &&
-        _coordinate[0] in this.points_label_map &&
-        _coordinate[1] in this.points_label_map[_coordinate[0]]
-      ) {
-        if (_coordinate[0] in this.erased_points) {
-          this.erased_points[_coordinate[0]][_coordinate[1]] = this.points_label_map[_coordinate[0]][_coordinate[1]];
-        } else {
-          this.erased_points[_coordinate[0]] = { [_coordinate[1]]: this.points_label_map[_coordinate[0]][_coordinate[1]] };
-        }
-      }
-    } else {
-      if (_coordinate) {
-        if (
-          _coordinate[0] in this.erased_points &&
-          _coordinate[1] in this.erased_points[_coordinate[0]]
-        ) {
-          delete this.erased_points[[_coordinate[0]]][_coordinate[1]];
-        }
-      }
-    }
-
-    this.paintCoordinate(ctx, _coordinate, value);
+    this.paintCoordinate(ctx, _coordinate, value, add_to_stack);
   };
 
   drawDots = (ctx, x, y, radius, color) => {
-    ctx.arc(x, y, radius + sizeOffset, 0, 2 * Math.PI);
+    ctx.arc(x, y, radius, 0, 2 * Math.PI);
     ctx.fillStyle = color;
     ctx.fill();
     ctx.beginPath();
@@ -338,30 +354,25 @@ class Canvas extends React.Component {
     if (this.undo_stack.length > 0) {
       let last = this.undo_stack.pop();
       this.redo_stack.push(last);
-      const canvas = this.refs.canvas;
-      const ctx = canvas.getContext("2d");
-      for (let i = 0; i < last["points"].length; i++) {
-        this.drawDots(
-          ctx,
-          last["points"][i][0],
-          last["points"][i][1],
-          2.2,
-          default_color
-        );
-        this.deleteFromPointsLabelMap(
-          last["points"][i][0],
-          last["points"][i][1]
-        );
-      }
-      if (this.undo_stack.length > 0) {
-        last = this.undo_stack[this.undo_stack.length - 1];
-        for (let i = 0; i < last["points"].length; i++) {
-          if (last["color_id"] == -1) {
-          } else {
-            this.paintCoordinate(
-              ctx,
-              [last["points"][i][0], last["points"][i][1]],
-              { color_id: last["color_id"], id: last["id"] }
+
+      if (last["id"] == -1) {
+        for (let i of last["points"]) {
+          this.labelDots(i[0], i[1], { id: i[2], color_id: i[3] }, 0, false);
+        }
+      } else {
+        for (let i of last["points"]) {
+          this.labelDots(i[0], i[1], { id: -1, color_id: -1 }, 0, false);
+        }
+
+        if (this.undo_stack.length > 0) {
+          last = this.undo_stack[this.undo_stack.length - 1];
+          for (let i of last["points"]) {
+            this.labelDots(
+              i[0],
+              i[1],
+              { id: last["id"], color_id: last["color_id"] },
+              0,
+              false
             );
           }
         }
@@ -370,23 +381,23 @@ class Canvas extends React.Component {
   };
 
   redo = () => {
+
     if (this.redo_stack.length > 0) {
       let last = this.redo_stack.pop();
       this.undo_stack.push(last);
-      const canvas = this.refs.canvas;
-      const ctx = canvas.getContext("2d");
-      for (let i = 0; i < last["points"].length; i++) {
-        if (last["color_id"] == -1) {
-          this.paintCoordinate(
-            ctx,
-            [last["points"][i][0], last["points"][i][1]],
-            { color_id: -1, id: -1 }
-          );
-        } else {
-          this.paintCoordinate(
-            ctx,
-            [last["points"][i][0], last["points"][i][1]],
-            { color_id: last["color_id"], id: last["id"] }
+
+      if (last["id"] == -1) {
+        for (let i of last["points"]) {
+          this.labelDots(i[0], i[1], { id: -1, color_id: -1 }, 0, false);
+        }
+      } else {
+        for (let i of last["points"]) {
+          this.labelDots(
+            i[0],
+            i[1],
+            { id: last["id"], color_id: last["color_id"] },
+            0,
+            false
           );
         }
       }
@@ -398,67 +409,59 @@ class Canvas extends React.Component {
     let _label_data = {};
     let is_data_present = false;
 
-    for (let label_id in this.labels_visited) {
-      if (label_id in _label_data || label_id == -1) {
-      } else {
-        _label_data[label_id] = {
-          labelIds: [label_id],
-          mode: "view",
-          status: "new",
-          type: "polygon",
-          data: []
-        };
-      }
-    }
-
     for (let x in this.points_label_map) {
       for (let y in this.points_label_map[x]) {
-        is_data_present = true;
-        _label_data[this.points_label_map[x][y]["id"]]["data"].push({
-          x: x,
-          y: y
-        });
-      }
-    }
-
-    for (let label_id in this.labels_visited) {
-      if (label_id in _label_data && _label_data[label_id]["data"].length > 0) {
-        _data.push(_label_data[label_id]);
-      }
-    }
-
-    // delete data
-    _label_data = {};
-    // let _erase_data = [];
-    for(let x in this.erased_points){
-      for(let y in this.erased_points[x]){
-        if(x in this.points_label_map_original && y in this.points_label_map_original[x]){
-          is_data_present = true;
-          if( this.erased_points[x][y]['id'] in _label_data){
-            _label_data[this.erased_points[x][y]['id']]['data'].push({x:x, y:y})
-          }else{
-            _label_data[this.erased_points[x][y]['id']] = {
-              labelIds: [this.erased_points[x][y]['id'].toString()],
+        if (
+          x in this.points_label_map_original &&
+          y in this.points_label_map_original[x]
+        ) {
+          if (
+            this.points_label_map_original[x][y]["label_id"] ==
+            this.points_label_map[x][y]["id"]
+          ) {
+          } else {
+            is_data_present = true;
+            _data.push({
+              type: "point",
+              id: this.points_label_map_original[x][y]["id"],
+              data: { x: x, y: y },
               mode: "view",
-              status: "deleted",
-              type: "polygon",
-              data: [{x:x, y:y}]
-            };
+              status: "changed",
+              labelIds: [this.points_label_map[x][y]["id"]],
+              selectedNode: 0
+            });
           }
+        } else {
+          is_data_present = true;
+          _data.push({
+            type: "point",
+            data: { x: x, y: y },
+            mode: "view",
+            status: "new",
+            labelIds: [this.points_label_map[x][y]["id"]],
+            selectedNode: 0
+          });
         }
       }
     }
 
-    console.log(_label_data)
-
-
-    for (let _label_id in _label_data) {
-      _data.push(_label_data[_label_id])
+    for (let x in this.points_label_map_original) {
+      for (let y in this.points_label_map_original[x]) {
+        if (x in this.points_label_map && y in this.points_label_map[x]) {
+        } else {
+          is_data_present = true;
+          _data.push({
+            type: "point",
+            id: this.points_label_map_original[x][y]["id"],
+            data: { x: x, y: y },
+            mode: "view",
+            status: "deleted",
+            labelIds: [this.points_label_map_original[x][y]["label_id"]],
+            selectedNode: 0
+          });
+        }
+      }
     }
-
-
-
-    // delete data
 
     let payload = {
       imgId: this.props.imageId,
@@ -467,8 +470,8 @@ class Canvas extends React.Component {
       annotations: {
         bBoxes: [],
         lines: [],
-        points: [],
-        polygons: _data
+        points: _data,
+        polygons: []
       },
       isJunk: null
     };
@@ -596,17 +599,15 @@ class Canvas extends React.Component {
           onClick={() => {
             console.log(
               "*****",
-              this.points_label_map,
-              this.points_label_map_original,
-              this.erased_points,
-              this.state.marginLeft,
-              this.state.marginTop
+              this.undo_stack,
+              this.redo_stack,
+              this.points_label_map
             );
           }}
         >
           {" "}
           console
-        </div> */}
+        </div>  */}
         <h5 style={{ textAlign: "center" }}>
           <u>Select a label</u>
         </h5>
@@ -654,7 +655,6 @@ class Canvas extends React.Component {
     );
   };
 
-
   getColorIndex = (data, labels, all_colors) => {
     for (let label_index = 0; label_index < labels.length; label_index++) {
       if (labels[label_index]["id"] == data["labelIds"][0]) {
@@ -665,28 +665,37 @@ class Canvas extends React.Component {
 
   drawOrigionalpoints = () => {
     let data = {};
-    if (this.props.annos.annotations.polygons.length) {
-      for (let i of this.props.annos.annotations.polygons) {
+    if (this.props.annos.annotations.points.length) {
+      for (let i of this.props.annos.annotations.points) {
         let color_index = this.getColorIndex(i, this.props.labels, colors);
-        for (let j of i.data) {
-          if (j.x in data) {
-          } else {
-            data[j.x] = {};
-          }
-          this.labelDots(
-            j.x,
-            j.y,
-            { id: i["labelIds"][0], color_id: color_index },
-            0.1
-          );
-          data[j.x][j.y] = i.labelIds[0];
+        if (i.data["x"] in data) {
+        } else {
+          data[i.data["x"]] = {};
         }
+        this.labelDots(
+          i.data["x"],
+          i.data["y"],
+          { id: i["labelIds"][0], color_id: color_index },
+          0.1,
+          false
+        );
+        data[i.data["x"]][i.data["y"]] = {
+          label_id: i.labelIds[0],
+          id: i["id"]
+        };
       }
+      this.points_label_map_original = data;
     }
-    this.points_label_map_original = data;
   };
 
+  componentWillUnmount() {
+    document.removeEventListener("keydown", this.keyDown, false);
+    document.removeEventListener("keyup", this.keyUp, false);
+  }
+
   componentDidMount() {
+    document.addEventListener("keydown", this.keyDown, false);
+    document.addEventListener("keyup", this.keyUp, false);
     const canvas = this.refs.canvas;
     const ctx = canvas.getContext("2d");
     var _img_ = new Image();
@@ -713,15 +722,13 @@ class Canvas extends React.Component {
     // _img_.src = "https://www.telegraph.co.uk/content/dam/news/2017/11/11/Lam1_trans%2B%2BnAdySV0BR-4fDN_-_p756cVfcy8zLGPV4EhRkjQy7tg.jpg";
     _img_.src = this.props.imageUrl;
 
-    // for
-    // _img_.src = this.deletelater_image[this.state.deletelater_index];
-
     canvas.addEventListener(
       "mousemove",
       evt => {
         if (this.isMouseDown == true && this.state.value !== null) {
           var mousePos = this.getMousePos(canvas, evt);
           this.labelDots(mousePos.x, mousePos.y, this.state.value, 9);
+          this.redo_stack = [];
         }
       },
       false
